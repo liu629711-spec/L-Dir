@@ -39,6 +39,8 @@ pub mod cmd_id {
     pub const FAV_MANAGE: u32 = 30101;
     // 帮助
     pub const ABOUT: u32 = 30200;
+    // 布局弹出菜单 12 档（Layout::ALL 序）
+    pub const LAYOUT_BASE: u32 = 30090;
 
     pub const ZOOM_STEPS: [u32; 11] = [60, 80, 100, 110, 120, 130, 140, 150, 160, 180, 200];
 }
@@ -128,6 +130,16 @@ pub fn label_of(menu: HMENU, id: u32) -> Option<String> {
             None
         }
     }
+}
+
+/// 构建 12 档布局弹出菜单（TrackPopupMenu 宿主；选中 id=30090+idx）。
+pub fn build_layout_menu() -> windows::core::Result<HMENU> {
+    use crate::ui_native::splitter::Layout;
+    let m = unsafe { CreatePopupMenu() }?;
+    for (i, l) in Layout::ALL.iter().enumerate() {
+        add(m, l.label(), cmd_id::LAYOUT_BASE + i as u32);
+    }
+    Ok(m)
 }
 
 #[cfg(test)]

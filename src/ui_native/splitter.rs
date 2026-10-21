@@ -76,6 +76,40 @@ impl Layout {
             _ => None,
         }
     }
+
+    /// 全部布局档（顺序=索引循环序，z6/v6 的 −1/+1 在此表上走）。
+    pub const ALL: [Layout; 12] = [
+        Layout::Default,
+        Layout::TwoVertical,
+        Layout::TwoHorizontal,
+        Layout::ThreeTopOneTwoBottom,
+        Layout::ThreeTopTwoOneBottom,
+        Layout::ThreeVertical,
+        Layout::ThreeHorizontal,
+        Layout::ThreeLeftOneTwoRight,
+        Layout::ThreeLeftTwoOneRight,
+        Layout::FourVertical,
+        Layout::FourHorizontal,
+        Layout::One,
+    ];
+
+    /// 自绘菜单文案（产品自有，非原版文案）。
+    pub fn label(self) -> &'static str {
+        match self {
+            Layout::Default => "四格（2×2）",
+            Layout::TwoVertical => "双格（左右）",
+            Layout::TwoHorizontal => "双格（上下）",
+            Layout::ThreeTopOneTwoBottom => "三格（1 上 2 下）",
+            Layout::ThreeTopTwoOneBottom => "三格（2 上 1 下）",
+            Layout::ThreeVertical => "三格（3 列）",
+            Layout::ThreeHorizontal => "三格（3 行）",
+            Layout::ThreeLeftOneTwoRight => "三格（1 左 2 右）",
+            Layout::ThreeLeftTwoOneRight => "三格（2 左 1 右）",
+            Layout::FourVertical => "四格（4 列）",
+            Layout::FourHorizontal => "四格（4 行）",
+            Layout::One => "单格",
+        }
+    }
 }
 
 /// 递归分割树的一个节点布局结果：4 个窗格各自的 (x, y, w, h)。

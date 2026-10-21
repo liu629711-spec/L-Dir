@@ -16,6 +16,7 @@ use crate::brand;
 use crate::shell;
 use crate::ui_native::mainframe::MainFrame;
 use crate::ui_native::menu::cmd_id;
+use crate::ui_native::splitter::Layout;
 
 /// 布局切换命令（导航工具栏，FUN_00429bc4）。
 /// 语义按反编译确证（附录 A.4）：z6/v6 = 布局索引 −1/+1 循环；
@@ -193,7 +194,55 @@ pub unsafe fn dispatch(frame: &mut MainFrame, main: HWND, id: u32) -> bool {
             println!("[qdir-rs] TEST tree_mode={next}");
             true
         }
-        id if (cmd_id::VIEW_ICON..=cmd_id::VIEW_DETAILS).contains(&id) => {
+        // —— 导航工具栏按钮（附录 A.4 确证语义：z6/v6=布局索引循环、
+        // upf=布局弹出菜单、go=下拉弹出、update=刷新重绘、viewtree=树切换、
+        // new/view 保留 *待复核* 现状）——
+        layout::Z6 => {
+            // 上一档布局（索引 −1 回绕）。
+            let idx = Layout::ALL.iter().position(|l| *l == frame.splitters.layout).unwrap_or(0);
+            let next = Layout::ALL[(idx + Layout::ALL.len() - 1) % Layout::ALL.len()];
+            set_layout(frame, main, next);
+            println!("[qdir-rs] TEST 布局循环- -> {}", next.label());
+            true
+        }
+        layout::V6 => {
+            let idx = Layout::ALL.iter().position(|l| *l == frame.splitters.layout).unwrap_or(0);
+            let next = Layout::ALL[(idx + 1) % Layout::ALL.len()];
+            set_layout(frame, main, next);
+            println!("[qdir-rs] TEST 布局循环+ -> {}", next.label());
+            true
+        }
+        layout::UPF => {
+            // 弹出 12 档布局菜单（原版 TrackPopupMenu 语义）。
+            show_layout_menu(frame, main);
+            true
+        }
+        layout::GO => {
+            show_layout_menu(frame, main);
+            true
+        }
+        layout::UPDATE => {
+            // 刷新重绘（原版 FUN_00465054 近似：全部窗格重灌）。
+            for i in 0..4 {
+                unsafe { frame.fill_pane(i) };
+            }
+            println!("[qdir-rs] TEST 工具栏刷新");
+            true
+        }
+        layout::VIEW => {
+            // 原版转发给窗格内容窗 0xd1f；当前内容窗无该私有消息处理，留痕。
+            println!("[qdir-rs] TEST 工具栏 view（0xd1f 语义待内容窗实现）");
+            true
+        }
+        layout::VIEWTREE => {
+            frame.session.tree_mode = !frame.session.tree_mode;
+            println!(
+                "[qdir-rs] TEST 工具栏树切换 tree_mode={}",
+                frame.session.tree_mode as u32
+            );
+            true
+        }
+                id if (cmd_id::VIEW_ICON..=cmd_id::VIEW_DETAILS).contains(&id) => {
             // 视图模式：LV_VIEW_ICON=0 / DETAILS=1 / SMALLICON=2 / LIST=3。
             let mode = match id {
                 cmd_id::VIEW_ICON => 0,
@@ -220,7 +269,15 @@ pub unsafe fn dispatch(frame: &mut MainFrame, main: HWND, id: u32) -> bool {
             println!("[qdir-rs] TEST 列宽自适应");
             true
         }
-        id if (cmd_id::ZOOM_BASE..cmd_id::ZOOM_BASE + 11).contains(&id) => {
+        id if (cmd_id::LAYOUT_BASE..cmd_id::LAYOUT_BASE + 12).contains(&id) => {
+            let idx = (id - cmd_id::LAYOUT_BASE) as usize;
+            if let Some(&l) = Layout::ALL.get(idx) {
+                set_layout(frame, main, l);
+                println!("[qdir-rs] TEST 布局选择 {} -> {}", id, l.label());
+            }
+            true
+        }
+                id if (cmd_id::ZOOM_BASE..cmd_id::ZOOM_BASE + 11).contains(&id) => {
             let pct = cmd_id::ZOOM_STEPS[(id - cmd_id::ZOOM_BASE) as usize];
             apply_ui_scale(frame, main, pct);
             true
@@ -374,6 +431,37 @@ fn run_state_dialog(main: HWND, save: bool) -> Option<std::path::PathBuf> {
         Some(std::path::PathBuf::from(String::from_utf16_lossy(&buf[..end])))
     } else {
         None
+    }
+}
+
+/// 12 档布局弹出菜单（光标锚点；原版为按钮下沿 TrackPopupMenu）。
+fn show_layout_menu(frame: &mut MainFrame, main: HWND) {
+    let _ = frame;
+    unsafe {
+        let menu = match crate::ui_native::menu::build_layout_menu() {
+            Ok(m) => m,
+            Err(_) => return,
+        };
+        let mut pt = POINT::default();
+        let _ = GetCursorPos(&mut pt);
+        let _ = SetForegroundWindow(main);
+        let cmd = TrackPopupMenu(
+            menu,
+            TPM_RETURNCMD | TPM_LEFTALIGN | TPM_TOPALIGN,
+            pt.x,
+            pt.y,
+            None,
+            main,
+            None,
+        );
+        let _ = DestroyMenu(menu);
+        if cmd.0 >= crate::ui_native::menu::cmd_id::LAYOUT_BASE as i32 {
+            let idx = (cmd.0 - crate::ui_native::menu::cmd_id::LAYOUT_BASE as i32) as usize;
+            if let Some(&l) = Layout::ALL.get(idx) {
+                set_layout(frame, main, l);
+                println!("[qdir-rs] TEST 布局弹出选择 -> {}", l.label());
+            }
+        }
     }
 }
 
