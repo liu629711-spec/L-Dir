@@ -1,0 +1,142 @@
+[
+ {
+  "popup": "Print",
+  "id": null,
+  "sub": [
+   {
+    "id": 0,
+    "text": "||||||"
+   },
+   {
+    "id": 1006,
+    "text": "» &Druck «"
+   },
+   {
+    "id": 0,
+    "text": "||||||"
+   },
+   {
+    "id": 1014,
+    "text": "<<"
+   },
+   {
+    "id": 1018,
+    "text": ">>"
+   },
+   {
+    "id": 0,
+    "text": "||||||"
+   },
+   {
+    "id": 57605,
+    "text": "» &Seite Einrichten «"
+   }
+  ]
+ },
+ {
+  "popup": "List",
+  "id": null,
+  "sub": [
+   {
+    "id": 32867,
+    "text": "&Spalten Anpassen"
+   },
+   {
+    "id": 32864,
+    "text": "&Linien anzeigen"
+   },
+   {
+    "id": 32789,
+    "text": "Liste &Exportieren"
+   },
+   {
+    "id": 0,
+    "text": ""
+   },
+   {
+    "id": 33938,
+    "text": "Spaltenbreite an Text anpassen (mit Spaltenkopf)"
+   },
+   {
+    "id": 33939,
+    "text": "Spaltenbreite an Text anpassen"
+   }
+  ]
+ },
+ {
+  "popup": "&Fenster",
+  "id": null,
+  "sub": [
+   {
+    "id": 57650,
+    "text": "Über&lappend"
+   },
+   {
+    "id": 57652,
+    "text": "&Nebeneinander"
+   },
+   {
+    "id": 57651,
+    "text": "&Untereinander"
+   },
+   {
+    "id": 57649,
+    "text": "&Symbole anordnen"
+   },
+   {
+    "id": 0,
+    "text": ""
+   }
+  ]
+ },
+ {
+  "popup": "&Favoriten",
+  "id": null,
+  "sub": [
+   {
+    "id": 32919,
+    "text": "Zu Favoriten hinzufügen"
+   },
+   {
+    "id": 32779,
+    "text": "&Verwalten"
+   },
+   {
+    "id": 0,
+    "text": ""
+   },
+   {
+    "id": 32785,
+    "text": "Im neuem Fenster mit Strg "
+   },
+   {
+    "id": 0,
+    "text": ""
+   },
+   {
+    "id": 0,
+    "text": ""
+   },
+   {
+    "id": 33931,
+    "text": "&Große Symbole"
+   },
+   {
+    "id": 33932,
+    "text": "&Kleine Symbole"
+   },
+   {
+    "id": 33933,
+    "text": "&Liste"
+   },
+   {
+    "id": 33934,
+    "text": "&Details"
+   },
+   {
+    "id": 32887,
+    "text": ""
+   }
+  ]
+ }
+]

@@ -1,0 +1,33 @@
+<html>
+<style>
+body,td,th,pre {font-family:Verdana,Arial; font-size:13; color:#000000; background-color:#fffefe; text-decoration:none;}
+</style>
+<head>
+<title> Find.Same.Images.OK</title>
+</head>
+<body bgcolor=#EEEEEE>
+
+<table align=center width=800 border=0><tr><td><b>
+<br>
+<h1>Starten Sie das Programm  Find.Same.Images.OK, wählen Sie die Optionen aus, ob sie Ordner mit Ordner vergleichen wollen, oder Vergleiche alle!</h1>
+<br><br>
+Durch das Drücken des Start Buttons starten Sie einfach die Suche nach den doppelten Bildern. Stellen Sie zuvor die Ähnlichkeits-Toleranz ( ... siehe Bild-1 Punkt 5)  ein, bevor Sie mit dem Scann beginnen. 
+<br><br>
+Ebenso können Sie bei Bedarf die Optionen gedrehte, gespiegelte und negative Bildersuche aktivieren!
+<br><br>
+Wenn der Bild-Suchvorgang beendet ist, können Sie in FSI.OK die Bilder durch die Check Boxen (Auswahlfeld) selektieren und dann die gewünschte Operation auswählen im Kontextmenü der Listenansicht. Oder Sie lassen einfach die schlechteren, bzw. besseren Bilder durch das Programm selbst auswählen.
+<br><br>
+Hilfreiche Informationen finden Sie hier: <a href="http://www.softwareok.de/?seite=faq-Find.Same.Images.OK&faq=0">... Find.Same.Images.OK FAQ!</a><br>
+oder auf :  <a href="#">... Find.Same.Images.OK Homepage</a>! <br>
+<br>
+<h3>Erweiterte Hilfedatei wird in Kürze verfügbar sein!</h3>
+<br>
+<b>Die neueste Version ist immer verfügbar auf:</b><br>
+# <a href="http://www.softwareok.de/?Freeware/Find.Same.Images.OK">... Find.Same.Images.OK Homepage</a><br>
+# <a href="http://www.softwareok.de/?Freeware/Find.Same.Images.OK/History">... History</a><br>
+# <a href="http://www.softwareok.de/?Download=Find.Same.Images.OK">... Download Find.Same.Images.OK</a>
+<br><br><br><br><br><br><br><br><br><br><br><br><br><br><br><br><br>
+</b></td></tr></table>
+</body>
+</html>
+

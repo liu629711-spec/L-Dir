@@ -1,0 +1,5310 @@
+{
+ "100": {
+  "id": "100",
+  "title": "",
+  "rect": [
+   0,
+   0,
+   374,
+   199
+  ],
+  "style": 2160591048,
+  "exstyle": 0,
+  "font": "MS Shell Dlg",
+  "ctls": [
+   {
+    "cls": "STATIC",
+    "cid": 4294967295,
+    "rect": [
+     11,
+     37,
+     20,
+     20
+    ],
+    "style": 1342177283,
+    "exstyle": 0,
+    "text": "@128"
+   },
+   {
+    "cls": "STATIC",
+    "cid": 1007,
+    "rect": [
+     40,
+     10,
+     119,
+     8
+    ],
+    "style": 1342308480,
+    "exstyle": 0,
+    "text": ""
+   },
+   {
+    "cls": "STATIC",
+    "cid": 1255,
+    "rect": [
+     40,
+     10,
+     128,
+     25
+    ],
+    "style": 1342308352,
+    "exstyle": 0,
+    "text": "Copyright © 2006-2017 Nenad  Hrg "
+   },
+   {
+    "cls": "STATIC",
+    "cid": 1000,
+    "rect": [
+     40,
+     42,
+     279,
+     17
+    ],
+    "style": 1342308352,
+    "exstyle": 0,
+    "text": "Freue mich ..."
+   },
+   {
+    "cls": "BUTTON",
+    "cid": 32781,
+    "rect": [
+     40,
+     60,
+     316,
+     14
+    ],
+    "style": 1342406656,
+    "exstyle": 0,
+    "text": "Contact: www.softwareok.de"
+   },
+   {
+    "cls": "STATIC",
+    "cid": 1080,
+    "rect": [
+     249,
+     17,
+     96,
+     18
+    ],
+    "style": 1342308608,
+    "exstyle": 0,
+    "text": "http://www.softwareok.de\nhttp://www.softwareok.com"
+   },
+   {
+    "cls": "STATIC",
+    "cid": 4294967295,
+    "rect": [
+     195,
+     7,
+     46,
+     8
+    ],
+    "style": 1342308352,
+    "exstyle": 0,
+    "text": "Programed by:"
+   },
+   {
+    "cls": "STATIC",
+    "cid": 1081,
+    "rect": [
+     249,
+     7,
+     36,
+     8
+    ],
+    "style": 1342308352,
+    "exstyle": 0,
+    "text": "Hrg Nenad"
+   },
+   {
+    "cls": "STATIC",
+    "cid": 4294967295,
+    "rect": [
+     203,
+     17,
+     38,
+     8
+    ],
+    "style": 1342308352,
+    "exstyle": 0,
+    "text": "Homepage:"
+   },
+   {
+    "cls": "EDIT",
+    "cid": 1001,
+    "rect": [
+     40,
+     77,
+     315,
+     60
+    ],
+    "style": 1342244996,
+    "exstyle": 131072,
+    "text": ""
+   },
+   {
+    "cls": "BUTTON",
+    "cid": 1,
+    "rect": [
+     310,
+     184,
+     57,
+     14
+    ],
+    "style": 1073807360,
+    "exstyle": 0,
+    "text": "&OK"
+   },
+   {
+    "cls": "STATIC",
+    "cid": 1049,
+    "rect": [
+     87,
+     151,
+     253,
+     8
+    ],
+    "style": 1342308352,
+    "exstyle": 0,
+    "text": "...."
+   },
+   {
+    "cls": "STATIC",
+    "cid": 1051,
+    "rect": [
+     87,
+     161,
+     253,
+     8
+    ],
+    "style": 1342308352,
+    "exstyle": 0,
+    "text": "...."
+   },
+   {
+    "cls": "STATIC",
+    "cid": 1052,
+    "rect": [
+     34,
+     162,
+     44,
+     8
+    ],
+    "style": 1342308354,
+    "exstyle": 0,
+    "text": "INI:"
+   },
+   {
+    "cls": "STATIC",
+    "cid": 1053,
+    "rect": [
+     34,
+     152,
+     44,
+     8
+    ],
+    "style": 1342308354,
+    "exstyle": 0,
+    "text": "Homepage:"
+   },
+   {
+    "cls": "STATIC",
+    "cid": 1054,
+    "rect": [
+     34,
+     142,
+     44,
+     8
+    ],
+    "style": 1342308354,
+    "exstyle": 0,
+    "text": "Homepage:"
+   },
+   {
+    "cls": "STATIC",
+    "cid": 1055,
+    "rect": [
+     87,
+     171,
+     253,
+     8
+    ],
+    "style": 1342308352,
+    "exstyle": 0,
+    "text": "...."
+   },
+   {
+    "cls": "STATIC",
+    "cid": 1050,
+    "rect": [
+     87,
+     142,
+     253,
+     8
+    ],
+    "style": 1342308352,
+    "exstyle": 0,
+    "text": "...."
+   }
+  ],
+  "fmt": "ex"
+ },
+ "101": {
+  "id": "101",
+  "title": "",
+  "rect": [
+   0,
+   0,
+   588,
+   96
+  ],
+  "style": 1073741896,
+  "exstyle": 0,
+  "font": "MS Shell Dlg",
+  "ctls": [
+   {
+    "cls": "EDIT",
+    "cid": 1002,
+    "rect": [
+     91,
+     30,
+     200,
+     12
+    ],
+    "style": 1350631568,
+    "exstyle": 0,
+    "text": ""
+   },
+   {
+    "cls": "EDIT",
+    "cid": 1004,
+    "rect": [
+     91,
+     44,
+     200,
+     12
+    ],
+    "style": 1350631568,
+    "exstyle": 0,
+    "text": ""
+   },
+   {
+    "cls": "STATIC",
+    "cid": 1066,
+    "rect": [
+     3,
+     30,
+     81,
+     12
+    ],
+    "style": 1342308866,
+    "exstyle": 0,
+    "text": "Filte&r :"
+   },
+   {
+    "cls": "EDIT",
+    "cid": 1003,
+    "rect": [
+     60,
+     4,
+     471,
+     12
+    ],
+    "style": 1342179456,
+    "exstyle": 0,
+    "text": ""
+   },
+   {
+    "cls": "STATIC",
+    "cid": 1010,
+    "rect": [
+     6,
+     4,
+     48,
+     10
+    ],
+    "style": 1342308866,
+    "exstyle": 0,
+    "text": "Ordner:"
+   },
+   {
+    "cls": "STATIC",
+    "cid": 1009,
+    "rect": [
+     38,
+     15,
+     1033,
+     12
+    ],
+    "style": 1342308364,
+    "exstyle": 0,
+    "text": "....."
+   },
+   {
+    "cls": "STATIC",
+    "cid": 1067,
+    "rect": [
+     3,
+     44,
+     81,
+     12
+    ],
+    "style": 1342308866,
+    "exstyle": 0,
+    "text": "Negativ-Filter :"
+   },
+   {
+    "cls": "STATIC",
+    "cid": 1068,
+    "rect": [
+     298,
+     44,
+     229,
+     10
+    ],
+    "style": 1342308864,
+    "exstyle": 0,
+    "text": "um bestimmte Dateien auszuschliessen //  z.B.: Thumbs.db;*.bak"
+   },
+   {
+    "cls": "STATIC",
+    "cid": 4031,
+    "rect": [
+     0,
+     1,
+     2571,
+     3
+    ],
+    "style": 1342177298,
+    "exstyle": 0,
+    "text": ""
+   },
+   {
+    "cls": "STATIC",
+    "cid": 4032,
+    "rect": [
+     0,
+     91,
+     2571,
+     3
+    ],
+    "style": 1342177298,
+    "exstyle": 0,
+    "text": ""
+   },
+   {
+    "cls": "STATIC",
+    "cid": 4033,
+    "rect": [
+     0,
+     73,
+     2571,
+     3
+    ],
+    "style": 1342177298,
+    "exstyle": 0,
+    "text": ""
+   },
+   {
+    "cls": "BUTTON",
+    "cid": 5005,
+    "rect": [
+     535,
+     45,
+     52,
+     10
+    ],
+    "style": 1342242819,
+    "exstyle": 0,
+    "text": "Check1"
+   },
+   {
+    "cls": "BUTTON",
+    "cid": 1006,
+    "rect": [
+     535,
+     32,
+     52,
+     10
+    ],
+    "style": 1342242819,
+    "exstyle": 0,
+    "text": "Check2"
+   },
+   {
+    "cls": "STATIC",
+    "cid": 1069,
+    "rect": [
+     3,
+     59,
+     81,
+     12
+    ],
+    "style": 1342308866,
+    "exstyle": 0,
+    "text": "Negativ-Filter :"
+   },
+   {
+    "cls": "EDIT",
+    "cid": 1005,
+    "rect": [
+     91,
+     58,
+     200,
+     12
+    ],
+    "style": 1350631568,
+    "exstyle": 0,
+    "text": ""
+   }
+  ],
+  "fmt": "old"
+ },
+ "102": {
+  "id": "102",
+  "title": "",
+  "rect": [
+   0,
+   0,
+   370,
+   165
+  ],
+  "style": 1073741888,
+  "exstyle": 196624,
+  "font": "MS Shell Dlg",
+  "ctls": [
+   {
+    "cls": "BUTTON",
+    "cid": 1,
+    "rect": [
+     320,
+     151,
+     50,
+     14
+    ],
+    "style": 1208025089,
+    "exstyle": 0,
+    "text": ""
+   },
+   {
+    "cls": "BUTTON",
+    "cid": 2,
+    "rect": [
+     264,
+     151,
+     50,
+     14
+    ],
+    "style": 1208025088,
+    "exstyle": 0,
+    "text": ""
+   },
+   {
+    "cls": "BUTTON",
+    "cid": 5005,
+    "rect": [
+     1,
+     60,
+     83,
+     10
+    ],
+    "style": 1073807363,
+    "exstyle": 0,
+    "text": ""
+   },
+   {
+    "cls": "STATIC",
+    "cid": 1006,
+    "rect": [
+     63,
+     2,
+     278,
+     21
+    ],
+    "style": 1342308352,
+    "exstyle": 0,
+    "text": ""
+   }
+  ],
+  "fmt": "ex"
+ },
+ "103": {
+  "id": "103",
+  "title": "",
+  "rect": [
+   0,
+   0,
+   179,
+   214
+  ],
+  "style": 1073742016,
+  "exstyle": 0,
+  "font": "MS Shell Dlg",
+  "ctls": [
+   {
+    "cls": "BUTTON",
+    "cid": 1,
+    "rect": [
+     129,
+     7,
+     50,
+     14
+    ],
+    "style": 1208025088,
+    "exstyle": 0,
+    "text": "OK"
+   },
+   {
+    "cls": "BUTTON",
+    "cid": 2,
+    "rect": [
+     129,
+     24,
+     50,
+     14
+    ],
+    "style": 1208025088,
+    "exstyle": 0,
+    "text": "Abbrechen"
+   }
+  ],
+  "fmt": "old"
+ },
+ "113": {
+  "id": "113",
+  "title": "%",
+  "rect": [
+   0,
+   0,
+   304,
+   89
+  ],
+  "style": 2160593088,
+  "exstyle": 0,
+  "font": "S Shell Dlg",
+  "ctls": [
+   {
+    "cls": "BUTTON",
+    "cid": 1,
+    "rect": [
+     189,
+     64,
+     50,
+     14
+    ],
+    "style": 1073807361,
+    "exstyle": 0,
+    "text": "OK"
+   },
+   {
+    "cls": "BUTTON",
+    "cid": 2,
+    "rect": [
+     247,
+     64,
+     50,
+     14
+    ],
+    "style": 1342242816,
+    "exstyle": 0,
+    "text": "Abbrechen"
+   },
+   {
+    "cls": "STATIC",
+    "cid": 1030,
+    "rect": [
+     7,
+     6,
+     290,
+     8
+    ],
+    "style": 1342308352,
+    "exstyle": 0,
+    "text": ".."
+   },
+   {
+    "cls": "msctls_progress32",
+    "cid": 1013,
+    "rect": [
+     7,
+     24,
+     290,
+     14
+    ],
+    "style": 1350565888,
+    "exstyle": 0,
+    "text": "Progress1"
+   }
+  ],
+  "fmt": "old"
+ },
+ "132": {
+  "id": "132",
+  "title": "",
+  "rect": [
+   0,
+   0,
+   442,
+   241
+  ],
+  "style": 1073741896,
+  "exstyle": 0,
+  "font": "MS Shell Dlg",
+  "ctls": [
+   {
+    "cls": "{8856F961-340A-11D0-A96B-00C04FD705A2}",
+    "cid": 1005,
+    "rect": [
+     0,
+     7,
+     441,
+     234
+    ],
+    "style": 1342242816,
+    "exstyle": 0,
+    "text": ""
+   }
+  ],
+  "fmt": "old"
+ },
+ "133": {
+  "id": "133",
+  "title": "MiniBrowserOK",
+  "rect": [
+   0,
+   0,
+   473,
+   196
+  ],
+  "style": 2161049672,
+  "exstyle": 0,
+  "font": "S Shell Dlg",
+  "ctls": [],
+  "fmt": "ex"
+ },
+ "134": {
+  "id": "134",
+  "title": "",
+  "rect": [
+   0,
+   0,
+   435,
+   28
+  ],
+  "style": 1073741888,
+  "exstyle": 65536,
+  "font": "MS Shell Dlg",
+  "ctls": [
+   {
+    "cls": "ComboBoxEx32",
+    "cid": 1053,
+    "rect": [
+     131,
+     0,
+     48,
+     30
+    ],
+    "style": 1344340226,
+    "exstyle": 0,
+    "text": ""
+   },
+   {
+    "cls": "STATIC",
+    "cid": 1024,
+    "rect": [
+     0,
+     3,
+     121,
+     8
+    ],
+    "style": 1342308352,
+    "exstyle": 0,
+    "text": "Static"
+   }
+  ],
+  "fmt": "ex"
+ },
+ "135": {
+  "id": "135",
+  "title": "",
+  "rect": [
+   0,
+   0,
+   324,
+   252
+  ],
+  "style": 2160724160,
+  "exstyle": 16,
+  "font": "MS Shell Dlg",
+  "ctls": [
+   {
+    "cls": "SysListView32",
+    "cid": 1012,
+    "rect": [
+     7,
+     82,
+     310,
+     77
+    ],
+    "style": 1350635529,
+    "exstyle": 0,
+    "text": "List1"
+   },
+   {
+    "cls": "SysListView32",
+    "cid": 1047,
+    "rect": [
+     7,
+     161,
+     310,
+     63
+    ],
+    "style": 1350631433,
+    "exstyle": 0,
+    "text": "List1"
+   },
+   {
+    "cls": "BUTTON",
+    "cid": 1014,
+    "rect": [
+     212,
+     233,
+     32,
+     14
+    ],
+    "style": 1073807360,
+    "exstyle": 0,
+    "text": "Set"
+   },
+   {
+    "cls": "STATIC",
+    "cid": 4294967295,
+    "rect": [
+     287,
+     28,
+     20,
+     20
+    ],
+    "style": 1342177283,
+    "exstyle": 0,
+    "text": "@107"
+   },
+   {
+    "cls": "BUTTON",
+    "cid": 1023,
+    "rect": [
+     7,
+     17,
+     310,
+     49
+    ],
+    "style": 1342177287,
+    "exstyle": 0,
+    "text": ""
+   },
+   {
+    "cls": "msctls_progress32",
+    "cid": 1013,
+    "rect": [
+     179,
+     230,
+     30,
+     9
+    ],
+    "style": 1073741824,
+    "exstyle": 0,
+    "text": "Progress1"
+   },
+   {
+    "cls": "BUTTON",
+    "cid": 1015,
+    "rect": [
+     253,
+     231,
+     64,
+     14
+    ],
+    "style": 1073807360,
+    "exstyle": 0,
+    "text": "Reset List"
+   },
+   {
+    "cls": "STATIC",
+    "cid": 1024,
+    "rect": [
+     7,
+     226,
+     147,
+     8
+    ],
+    "style": 1342308352,
+    "exstyle": 0,
+    "text": "url"
+   },
+   {
+    "cls": "BUTTON",
+    "cid": 1016,
+    "rect": [
+     143,
+     231,
+     32,
+     14
+    ],
+    "style": 1073807360,
+    "exstyle": 0,
+    "text": ""
+   },
+   {
+    "cls": "BUTTON",
+    "cid": 1018,
+    "rect": [
+     176,
+     231,
+     32,
+     14
+    ],
+    "style": 1073807360,
+    "exstyle": 0,
+    "text": ""
+   },
+   {
+    "cls": "EDIT",
+    "cid": 1002,
+    "rect": [
+     167,
+     240,
+     150,
+     12
+    ],
+    "style": 1208025216,
+    "exstyle": 0,
+    "text": ""
+   },
+   {
+    "cls": "STATIC",
+    "cid": 1046,
+    "rect": [
+     14,
+     29,
+     268,
+     32
+    ],
+    "style": 1342308352,
+    "exstyle": 0,
+    "text": "Static"
+   }
+  ],
+  "fmt": "ex"
+ },
+ "201": {
+  "id": "201",
+  "title": "",
+  "rect": [
+   0,
+   0,
+   408,
+   230
+  ],
+  "style": 1074005056,
+  "exstyle": 0,
+  "font": "MS Shell Dlg",
+  "ctls": [],
+  "fmt": "old"
+ },
+ "202": {
+  "id": "202",
+  "title": "",
+  "rect": [
+   0,
+   0,
+   464,
+   192
+  ],
+  "style": 2160591048,
+  "exstyle": 0,
+  "font": "MS Shell Dlg",
+  "ctls": [
+   {
+    "cls": "BUTTON",
+    "cid": 1201,
+    "rect": [
+     16,
+     154,
+     292,
+     11
+    ],
+    "style": 1342242825,
+    "exstyle": 0,
+    "text": "Ich stimme dem Lizenzvertrag zu"
+   },
+   {
+    "cls": "BUTTON",
+    "cid": 1204,
+    "rect": [
+     16,
+     164,
+     292,
+     16
+    ],
+    "style": 1342242825,
+    "exstyle": 32,
+    "text": "Ich lehne den Lizenzvertrag ab"
+   },
+   {
+    "cls": "EDIT",
+    "cid": 1002,
+    "rect": [
+     7,
+     30,
+     450,
+     82
+    ],
+    "style": 1352728580,
+    "exstyle": 32,
+    "text": ""
+   },
+   {
+    "cls": "BUTTON",
+    "cid": 1,
+    "rect": [
+     407,
+     147,
+     50,
+     14
+    ],
+    "style": 1342242816,
+    "exstyle": 0,
+    "text": "OK"
+   },
+   {
+    "cls": "STATIC",
+    "cid": 4294967295,
+    "rect": [
+     11,
+     3,
+     73,
+     8
+    ],
+    "style": 1342308352,
+    "exstyle": 0,
+    "text": "Language / Sprache : "
+   },
+   {
+    "cls": "BUTTON",
+    "cid": 1031,
+    "rect": [
+     3,
+     14,
+     50,
+     12
+    ],
+    "style": 1073807360,
+    "exstyle": 0,
+    "text": "Deutsch"
+   },
+   {
+    "cls": "BUTTON",
+    "cid": 1017,
+    "rect": [
+     65,
+     15,
+     50,
+     12
+    ],
+    "style": 1073807360,
+    "exstyle": 0,
+    "text": "English"
+   },
+   {
+    "cls": "STATIC",
+    "cid": 1001,
+    "rect": [
+     15,
+     117,
+     398,
+     20
+    ],
+    "style": 1342308352,
+    "exstyle": 0,
+    "text": ""
+   },
+   {
+    "cls": "STATIC",
+    "cid": 1050,
+    "rect": [
+     16,
+     140,
+     253,
+     8
+    ],
+    "style": 1342308352,
+    "exstyle": 0,
+    "text": "...."
+   }
+  ],
+  "fmt": "ex"
+ },
+ "203": {
+  "id": "203",
+  "title": "",
+  "rect": [
+   0,
+   0,
+   286,
+   67
+  ],
+  "style": 2160591040,
+  "exstyle": 0,
+  "font": "MS Shell Dlg",
+  "ctls": [
+   {
+    "cls": "EDIT",
+    "cid": 1002,
+    "rect": [
+     8,
+     7,
+     270,
+     14
+    ],
+    "style": 1350631552,
+    "exstyle": 0,
+    "text": ""
+   },
+   {
+    "cls": "BUTTON",
+    "cid": 1,
+    "rect": [
+     237,
+     24,
+     40,
+     14
+    ],
+    "style": 1342242816,
+    "exstyle": 0,
+    "text": "OK"
+   },
+   {
+    "cls": "BUTTON",
+    "cid": 5005,
+    "rect": [
+     9,
+     25,
+     222,
+     10
+    ],
+    "style": 1342242819,
+    "exstyle": 0,
+    "text": ""
+   },
+   {
+    "cls": "BUTTON",
+    "cid": 1060,
+    "rect": [
+     9,
+     38,
+     222,
+     10
+    ],
+    "style": 1342242819,
+    "exstyle": 0,
+    "text": ""
+   },
+   {
+    "cls": "BUTTON",
+    "cid": 42868,
+    "rect": [
+     9,
+     51,
+     222,
+     10
+    ],
+    "style": 1342177283,
+    "exstyle": 0,
+    "text": ""
+   },
+   {
+    "cls": "STATIC",
+    "cid": 65535,
+    "rect": [
+     247,
+     39,
+     20,
+     20
+    ],
+    "style": 1342177283,
+    "exstyle": 0,
+    "text": "@130"
+   }
+  ],
+  "fmt": "old"
+ },
+ "206": {
+  "id": "206",
+  "title": "Dialogfeld",
+  "rect": [
+   0,
+   0,
+   501,
+   322
+  ],
+  "style": 2161051720,
+  "exstyle": 0,
+  "font": "MS Shell Dlg",
+  "ctls": [],
+  "fmt": "old"
+ },
+ "208": {
+  "id": "208",
+  "title": "Dialog",
+  "rect": [
+   0,
+   0,
+   545,
+   407
+  ],
+  "style": 2161049664,
+  "exstyle": 262144,
+  "font": "MS Shell Dlg",
+  "ctls": [],
+  "fmt": "ex"
+ },
+ "212": {
+  "id": "212",
+  "title": "",
+  "rect": [
+   0,
+   0,
+   338,
+   214
+  ],
+  "style": 2160593088,
+  "exstyle": 0,
+  "font": "MS Shell Dlg",
+  "ctls": [
+   {
+    "cls": "STATIC",
+    "cid": 1072,
+    "rect": [
+     157,
+     124,
+     20,
+     20
+    ],
+    "style": 1342177283,
+    "exstyle": 0,
+    "text": "@128"
+   },
+   {
+    "cls": "BUTTON",
+    "cid": 1201,
+    "rect": [
+     20,
+     122,
+     134,
+     10
+    ],
+    "style": 1342177289,
+    "exstyle": 0,
+    "text": "a"
+   },
+   {
+    "cls": "BUTTON",
+    "cid": 1202,
+    "rect": [
+     20,
+     134,
+     127,
+     10
+    ],
+    "style": 1342177289,
+    "exstyle": 0,
+    "text": "I"
+   },
+   {
+    "cls": "EDIT",
+    "cid": 1001,
+    "rect": [
+     16,
+     52,
+     143,
+     12
+    ],
+    "style": 1350631552,
+    "exstyle": 0,
+    "text": ""
+   },
+   {
+    "cls": "SysListView32",
+    "cid": 1012,
+    "rect": [
+     16,
+     68,
+     144,
+     36
+    ],
+    "style": 1342259201,
+    "exstyle": 512,
+    "text": "List1"
+   },
+   {
+    "cls": "COMBOBOX",
+    "cid": 1002,
+    "rect": [
+     72,
+     175,
+     206,
+     82
+    ],
+    "style": 1344340226,
+    "exstyle": 0,
+    "text": ""
+   },
+   {
+    "cls": "BUTTON",
+    "cid": 5005,
+    "rect": [
+     182,
+     48,
+     97,
+     10
+    ],
+    "style": 1342242819,
+    "exstyle": 0,
+    "text": "D"
+   },
+   {
+    "cls": "BUTTON",
+    "cid": 1006,
+    "rect": [
+     182,
+     60,
+     97,
+     10
+    ],
+    "style": 1476460547,
+    "exstyle": 0,
+    "text": "P"
+   },
+   {
+    "cls": "BUTTON",
+    "cid": 1007,
+    "rect": [
+     182,
+     72,
+     97,
+     10
+    ],
+    "style": 1342242819,
+    "exstyle": 0,
+    "text": "S"
+   },
+   {
+    "cls": "BUTTON",
+    "cid": 1010,
+    "rect": [
+     182,
+     84,
+     97,
+     10
+    ],
+    "style": 1342242819,
+    "exstyle": 0,
+    "text": "Q"
+   },
+   {
+    "cls": "BUTTON",
+    "cid": 1014,
+    "rect": [
+     282,
+     175,
+     40,
+     13
+    ],
+    "style": 1342242816,
+    "exstyle": 0,
+    "text": ".."
+   },
+   {
+    "cls": "BUTTON",
+    "cid": 2,
+    "rect": [
+     219,
+     193,
+     54,
+     14
+    ],
+    "style": 1342242816,
+    "exstyle": 0,
+    "text": "Abbrechen"
+   },
+   {
+    "cls": "BUTTON",
+    "cid": 1,
+    "rect": [
+     277,
+     193,
+     54,
+     14
+    ],
+    "style": 1342242816,
+    "exstyle": 0,
+    "text": "Install"
+   },
+   {
+    "cls": "BUTTON",
+    "cid": 1030,
+    "rect": [
+     10,
+     111,
+     321,
+     46
+    ],
+    "style": 1342177287,
+    "exstyle": 0,
+    "text": ""
+   },
+   {
+    "cls": "STATIC",
+    "cid": 1037,
+    "rect": [
+     3,
+     177,
+     63,
+     8
+    ],
+    "style": 1342308354,
+    "exstyle": 0,
+    "text": "Z"
+   },
+   {
+    "cls": "BUTTON",
+    "cid": 1038,
+    "rect": [
+     175,
+     37,
+     156,
+     73
+    ],
+    "style": 1342177287,
+    "exstyle": 0,
+    "text": ""
+   },
+   {
+    "cls": "BUTTON",
+    "cid": 1039,
+    "rect": [
+     10,
+     37,
+     158,
+     73
+    ],
+    "style": 1342177287,
+    "exstyle": 0,
+    "text": ""
+   },
+   {
+    "cls": "STATIC",
+    "cid": 4294967295,
+    "rect": [
+     297,
+     65,
+     20,
+     20
+    ],
+    "style": 1342177283,
+    "exstyle": 0,
+    "text": "@128"
+   },
+   {
+    "cls": "STATIC",
+    "cid": 1004,
+    "rect": [
+     9,
+     193,
+     78,
+     13
+    ],
+    "style": 1476526592,
+    "exstyle": 0,
+    "text": "Quick Installer"
+   },
+   {
+    "cls": "BUTTON",
+    "cid": 1011,
+    "rect": [
+     124,
+     196,
+     89,
+     10
+    ],
+    "style": 1342242819,
+    "exstyle": 0,
+    "text": ""
+   },
+   {
+    "cls": "STATIC",
+    "cid": 12208,
+    "rect": [
+     0,
+     0,
+     338,
+     35
+    ],
+    "style": 1342178830,
+    "exstyle": 0,
+    "text": "@420"
+   },
+   {
+    "cls": "STATIC",
+    "cid": 2209,
+    "rect": [
+     -1,
+     33,
+     400,
+     3
+    ],
+    "style": 1342177298,
+    "exstyle": 0,
+    "text": ""
+   },
+   {
+    "cls": "BUTTON",
+    "cid": 1008,
+    "rect": [
+     182,
+     143,
+     143,
+     10
+    ],
+    "style": 1342242819,
+    "exstyle": 0,
+    "text": "S"
+   },
+   {
+    "cls": "BUTTON",
+    "cid": 1013,
+    "rect": [
+     182,
+     131,
+     143,
+     10
+    ],
+    "style": 1342242819,
+    "exstyle": 0,
+    "text": "Q"
+   },
+   {
+    "cls": "BUTTON",
+    "cid": 1015,
+    "rect": [
+     182,
+     120,
+     143,
+     10
+    ],
+    "style": 1342242819,
+    "exstyle": 0,
+    "text": "ADMin"
+   },
+   {
+    "cls": "STATIC",
+    "cid": 1040,
+    "rect": [
+     3,
+     162,
+     63,
+     8
+    ],
+    "style": 1342308354,
+    "exstyle": 0,
+    "text": "Z"
+   },
+   {
+    "cls": "COMBOBOX",
+    "cid": 1018,
+    "rect": [
+     72,
+     159,
+     206,
+     30
+    ],
+    "style": 1344340227,
+    "exstyle": 0,
+    "text": ""
+   }
+  ],
+  "fmt": "ex"
+ },
+ "214": {
+  "id": "214",
+  "title": "Uninstall",
+  "rect": [
+   22,
+   17,
+   325,
+   86
+  ],
+  "style": 2160855108,
+  "exstyle": 262144,
+  "font": "S Shell Dlg",
+  "ctls": [
+   {
+    "cls": "STATIC",
+    "cid": 555,
+    "rect": [
+     16,
+     31,
+     21,
+     20
+    ],
+    "style": 1342177283,
+    "exstyle": 0,
+    "text": "@129"
+   },
+   {
+    "cls": "BUTTON",
+    "cid": 1,
+    "rect": [
+     272,
+     54,
+     45,
+     14
+    ],
+    "style": 1342242816,
+    "exstyle": 0,
+    "text": "OK"
+   },
+   {
+    "cls": "EDIT",
+    "cid": 1000,
+    "rect": [
+     63,
+     33,
+     254,
+     12
+    ],
+    "style": 1476460672,
+    "exstyle": 131072,
+    "text": ""
+   },
+   {
+    "cls": "BUTTON",
+    "cid": 2,
+    "rect": [
+     224,
+     54,
+     45,
+     14
+    ],
+    "style": 1342242816,
+    "exstyle": 0,
+    "text": "&Abbrechen"
+   },
+   {
+    "cls": "STATIC",
+    "cid": 4294967295,
+    "rect": [
+     8,
+     71,
+     48,
+     8
+    ],
+    "style": 1476526592,
+    "exstyle": 0,
+    "text": "Quck Uninstall"
+   },
+   {
+    "cls": "STATIC",
+    "cid": 4294967295,
+    "rect": [
+     63,
+     75,
+     254,
+     1
+    ],
+    "style": 1342181384,
+    "exstyle": 0,
+    "text": ""
+   },
+   {
+    "cls": "STATIC",
+    "cid": 1001,
+    "rect": [
+     62,
+     6,
+     255,
+     8
+    ],
+    "style": 1342308352,
+    "exstyle": 0,
+    "text": ""
+   },
+   {
+    "cls": "BUTTON",
+    "cid": 5005,
+    "rect": [
+     61,
+     47,
+     119,
+     10
+    ],
+    "style": 1342242819,
+    "exstyle": 0,
+    "text": "R"
+   },
+   {
+    "cls": "COMBOBOX",
+    "cid": 1018,
+    "rect": [
+     63,
+     17,
+     254,
+     30
+    ],
+    "style": 1344340227,
+    "exstyle": 0,
+    "text": ""
+   }
+  ],
+  "fmt": "ex"
+ },
+ "218": {
+  "id": "218",
+  "title": "Dialog",
+  "rect": [
+   0,
+   0,
+   518,
+   273
+  ],
+  "style": 2161049664,
+  "exstyle": 0,
+  "font": "MS Shell Dlg",
+  "ctls": [
+   {
+    "cls": "{8856F961-340A-11D0-A96B-00C04FD705A2}",
+    "cid": 1005,
+    "rect": [
+     7,
+     32,
+     496,
+     234
+    ],
+    "style": 1342242816,
+    "exstyle": 0,
+    "text": ""
+   },
+   {
+    "cls": "STATIC",
+    "cid": 65535,
+    "rect": [
+     7,
+     7,
+     21,
+     20
+    ],
+    "style": 1342177283,
+    "exstyle": 0,
+    "text": "@128"
+   },
+   {
+    "cls": "STATIC",
+    "cid": 65535,
+    "rect": [
+     30,
+     16,
+     481,
+     8
+    ],
+    "style": 1476526080,
+    "exstyle": 0,
+    "text": "Quick Help"
+   }
+  ],
+  "fmt": "old"
+ },
+ "220": {
+  "id": "220",
+  "title": "",
+  "rect": [
+   0,
+   0,
+   450,
+   214
+  ],
+  "style": 1220542656,
+  "exstyle": 0,
+  "font": "MS Shell Dlg",
+  "ctls": [
+   {
+    "cls": "BUTTON",
+    "cid": 32880,
+    "rect": [
+     15,
+     16,
+     108,
+     10
+    ],
+    "style": 1342242819,
+    "exstyle": 0,
+    "text": "Classic/Flat Design"
+   },
+   {
+    "cls": "BUTTON",
+    "cid": 32800,
+    "rect": [
+     15,
+     28,
+     139,
+     10
+    ],
+    "style": 1342242819,
+    "exstyle": 0,
+    "text": "zum Shellmenü hinzufügen"
+   },
+   {
+    "cls": "BUTTON",
+    "cid": 32793,
+    "rect": [
+     174,
+     16,
+     182,
+     10
+    ],
+    "style": 1342242819,
+    "exstyle": 0,
+    "text": "Alle Dateien und Ordner anzeigen"
+   },
+   {
+    "cls": "BUTTON",
+    "cid": 32794,
+    "rect": [
+     174,
+     27,
+     186,
+     10
+    ],
+    "style": 1342242819,
+    "exstyle": 0,
+    "text": "Erweiterungen bei bekannten Dateitypen ausblenden"
+   },
+   {
+    "cls": "BUTTON",
+    "cid": 32798,
+    "rect": [
+     174,
+     40,
+     183,
+     10
+    ],
+    "style": 1342243075,
+    "exstyle": 0,
+    "text": "<A>... mehr</A>"
+   },
+   {
+    "cls": "BUTTON",
+    "cid": 65535,
+    "rect": [
+     167,
+     6,
+     198,
+     49
+    ],
+    "style": 1342177287,
+    "exstyle": 0,
+    "text": "# System"
+   },
+   {
+    "cls": "BUTTON",
+    "cid": 65535,
+    "rect": [
+     7,
+     6,
+     154,
+     50
+    ],
+    "style": 1342177287,
+    "exstyle": 0,
+    "text": "# Q-Dir"
+   },
+   {
+    "cls": "BUTTON",
+    "cid": 1032,
+    "rect": [
+     7,
+     58,
+     155,
+     49
+    ],
+    "style": 1342177287,
+    "exstyle": 0,
+    "text": "#"
+   },
+   {
+    "cls": "BUTTON",
+    "cid": 32810,
+    "rect": [
+     13,
+     82,
+     111,
+     10
+    ],
+    "style": 1342242819,
+    "exstyle": 0,
+    "text": "Beim Ausklappen markieren "
+   },
+   {
+    "cls": "BUTTON",
+    "cid": 32809,
+    "rect": [
+     13,
+     71,
+     111,
+     10
+    ],
+    "style": 1342242819,
+    "exstyle": 0,
+    "text": "mit Verzeichnisstruktur"
+   },
+   {
+    "cls": "BUTTON",
+    "cid": 1007,
+    "rect": [
+     7,
+     153,
+     270,
+     10
+    ],
+    "style": 1208025091,
+    "exstyle": 0,
+    "text": ""
+   },
+   {
+    "cls": "BUTTON",
+    "cid": 1033,
+    "rect": [
+     167,
+     58,
+     198,
+     49
+    ],
+    "style": 1342177287,
+    "exstyle": 0,
+    "text": "#"
+   },
+   {
+    "cls": "BUTTON",
+    "cid": 32812,
+    "rect": [
+     174,
+     71,
+     179,
+     10
+    ],
+    "style": 1342242819,
+    "exstyle": 0,
+    "text": "Merken der markierten Objekte && Sortierspalte"
+   },
+   {
+    "cls": "BUTTON",
+    "cid": 32811,
+    "rect": [
+     174,
+     82,
+     183,
+     10
+    ],
+    "style": 1342242819,
+    "exstyle": 0,
+    "text": "aktuelle Ansicht merken (Detail, Miniatur, ...)"
+   },
+   {
+    "cls": "BUTTON",
+    "cid": 1026,
+    "rect": [
+     174,
+     93,
+     185,
+     10
+    ],
+    "style": 1342242819,
+    "exstyle": 0,
+    "text": "<A>... auto wie bei MS-Explorer</A>"
+   },
+   {
+    "cls": "BUTTON",
+    "cid": 1034,
+    "rect": [
+     7,
+     109,
+     357,
+     50
+    ],
+    "style": 1342177287,
+    "exstyle": 0,
+    "text": "#"
+   },
+   {
+    "cls": "EDIT",
+    "cid": 1002,
+    "rect": [
+     14,
+     120,
+     289,
+     14
+    ],
+    "style": 1350631552,
+    "exstyle": 0,
+    "text": ""
+   },
+   {
+    "cls": "BUTTON",
+    "cid": 1015,
+    "rect": [
+     311,
+     120,
+     19,
+     14
+    ],
+    "style": 1342242816,
+    "exstyle": 0,
+    "text": "Def."
+   },
+   {
+    "cls": "EDIT",
+    "cid": 1003,
+    "rect": [
+     14,
+     141,
+     289,
+     14
+    ],
+    "style": 1350631552,
+    "exstyle": 0,
+    "text": ""
+   },
+   {
+    "cls": "BUTTON",
+    "cid": 1016,
+    "rect": [
+     311,
+     140,
+     19,
+     14
+    ],
+    "style": 1342242816,
+    "exstyle": 0,
+    "text": "Def."
+   },
+   {
+    "cls": "BUTTON",
+    "cid": 1031,
+    "rect": [
+     12,
+     41,
+     143,
+     10
+    ],
+    "style": 1073807360,
+    "exstyle": 0,
+    "text": "Button1"
+   },
+   {
+    "cls": "BUTTON",
+    "cid": 3,
+    "rect": [
+     414,
+     151,
+     29,
+     8
+    ],
+    "style": 1073807360,
+    "exstyle": 0,
+    "text": "&OK"
+   },
+   {
+    "cls": "BUTTON",
+    "cid": 1035,
+    "rect": [
+     242,
+     38,
+     201,
+     31
+    ],
+    "style": 1207959559,
+    "exstyle": 0,
+    "text": "Default Tab"
+   },
+   {
+    "cls": "EDIT",
+    "cid": 1004,
+    "rect": [
+     248,
+     49,
+     165,
+     14
+    ],
+    "style": 1216413824,
+    "exstyle": 0,
+    "text": ""
+   },
+   {
+    "cls": "BUTTON",
+    "cid": 1017,
+    "rect": [
+     416,
+     49,
+     19,
+     14
+    ],
+    "style": 1208025088,
+    "exstyle": 0,
+    "text": "...."
+   },
+   {
+    "cls": "BUTTON",
+    "cid": 1036,
+    "rect": [
+     7,
+     163,
+     351,
+     33
+    ],
+    "style": 1342177287,
+    "exstyle": 0,
+    "text": "#"
+   },
+   {
+    "cls": "EDIT",
+    "cid": 1005,
+    "rect": [
+     14,
+     175,
+     289,
+     14
+    ],
+    "style": 1350631552,
+    "exstyle": 0,
+    "text": ""
+   },
+   {
+    "cls": "BUTTON",
+    "cid": 1018,
+    "rect": [
+     311,
+     174,
+     19,
+     14
+    ],
+    "style": 1342242816,
+    "exstyle": 0,
+    "text": "Def."
+   }
+  ],
+  "fmt": "old"
+ },
+ "221": {
+  "id": "221",
+  "title": "",
+  "rect": [
+   0,
+   0,
+   370,
+   177
+  ],
+  "style": 2294808768,
+  "exstyle": 0,
+  "font": "MS Shell Dlg",
+  "ctls": [
+   {
+    "cls": "SysListView32",
+    "cid": 1012,
+    "rect": [
+     7,
+     21,
+     356,
+     112
+    ],
+    "style": 1350631433,
+    "exstyle": 0,
+    "text": "List1"
+   },
+   {
+    "cls": "BUTTON",
+    "cid": 1,
+    "rect": [
+     313,
+     7,
+     50,
+     12
+    ],
+    "style": 1073807360,
+    "exstyle": 0,
+    "text": "&OK"
+   },
+   {
+    "cls": "BUTTON",
+    "cid": 1016,
+    "rect": [
+     69,
+     134,
+     71,
+     12
+    ],
+    "style": 1342242816,
+    "exstyle": 0,
+    "text": "Ü"
+   },
+   {
+    "cls": "BUTTON",
+    "cid": 32816,
+    "rect": [
+     143,
+     134,
+     71,
+     12
+    ],
+    "style": 1342242816,
+    "exstyle": 0,
+    "text": "E&xport"
+   },
+   {
+    "cls": "BUTTON",
+    "cid": 42812,
+    "rect": [
+     217,
+     134,
+     71,
+     12
+    ],
+    "style": 1342242816,
+    "exstyle": 0,
+    "text": "&Import"
+   },
+   {
+    "cls": "BUTTON",
+    "cid": 32819,
+    "rect": [
+     291,
+     134,
+     71,
+     12
+    ],
+    "style": 1342242816,
+    "exstyle": 0,
+    "text": "&Empfehlen"
+   },
+   {
+    "cls": "BUTTON",
+    "cid": 32802,
+    "rect": [
+     7,
+     153,
+     95,
+     10
+    ],
+    "style": 1342242819,
+    "exstyle": 0,
+    "text": "Use C"
+   },
+   {
+    "cls": "STATIC",
+    "cid": 1042,
+    "rect": [
+     106,
+     150,
+     263,
+     26
+    ],
+    "style": 1342308352,
+    "exstyle": 0,
+    "text": ".."
+   }
+  ],
+  "fmt": "old"
+ },
+ "223": {
+  "id": "223",
+  "title": "",
+  "rect": [
+   0,
+   0,
+   286,
+   51
+  ],
+  "style": 2160591040,
+  "exstyle": 0,
+  "font": "MS Shell Dlg",
+  "ctls": [
+   {
+    "cls": "EDIT",
+    "cid": 1002,
+    "rect": [
+     9,
+     15,
+     270,
+     14
+    ],
+    "style": 1350631552,
+    "exstyle": 0,
+    "text": ""
+   },
+   {
+    "cls": "BUTTON",
+    "cid": 1,
+    "rect": [
+     246,
+     30,
+     33,
+     14
+    ],
+    "style": 1342242816,
+    "exstyle": 0,
+    "text": "OK"
+   },
+   {
+    "cls": "BUTTON",
+    "cid": 1005,
+    "rect": [
+     9,
+     33,
+     176,
+     10
+    ],
+    "style": 1073807363,
+    "exstyle": 0,
+    "text": ""
+   },
+   {
+    "cls": "STATIC",
+    "cid": 1006,
+    "rect": [
+     7,
+     3,
+     272,
+     8
+    ],
+    "style": 1342308352,
+    "exstyle": 0,
+    "text": ""
+   }
+  ],
+  "fmt": "old"
+ },
+ "228": {
+  "id": "228",
+  "title": "",
+  "rect": [
+   0,
+   0,
+   370,
+   174
+  ],
+  "style": 2160591040,
+  "exstyle": 0,
+  "font": "MS Shell Dlg",
+  "ctls": [
+   {
+    "cls": "BUTTON",
+    "cid": 1,
+    "rect": [
+     313,
+     153,
+     50,
+     14
+    ],
+    "style": 1073807361,
+    "exstyle": 0,
+    "text": "OK"
+   },
+   {
+    "cls": "BUTTON",
+    "cid": 32803,
+    "rect": [
+     15,
+     19,
+     142,
+     10
+    ],
+    "style": 1342242819,
+    "exstyle": 0,
+    "text": ""
+   },
+   {
+    "cls": "BUTTON",
+    "cid": 32805,
+    "rect": [
+     15,
+     31,
+     142,
+     10
+    ],
+    "style": 1342242819,
+    "exstyle": 0,
+    "text": ""
+   },
+   {
+    "cls": "BUTTON",
+    "cid": 32806,
+    "rect": [
+     15,
+     43,
+     142,
+     10
+    ],
+    "style": 1342242819,
+    "exstyle": 0,
+    "text": ""
+   },
+   {
+    "cls": "BUTTON",
+    "cid": 1035,
+    "rect": [
+     7,
+     3,
+     192,
+     55
+    ],
+    "style": 1342177287,
+    "exstyle": 0,
+    "text": ""
+   },
+   {
+    "cls": "COMBOBOX",
+    "cid": 1018,
+    "rect": [
+     14,
+     72,
+     139,
+     77
+    ],
+    "style": 1344340227,
+    "exstyle": 0,
+    "text": ""
+   },
+   {
+    "cls": "BUTTON",
+    "cid": 1036,
+    "rect": [
+     7,
+     60,
+     356,
+     48
+    ],
+    "style": 1342177287,
+    "exstyle": 0,
+    "text": ""
+   },
+   {
+    "cls": "COMBOBOX",
+    "cid": 1019,
+    "rect": [
+     215,
+     72,
+     139,
+     76
+    ],
+    "style": 1344340227,
+    "exstyle": 0,
+    "text": ""
+   },
+   {
+    "cls": "BUTTON",
+    "cid": 45647,
+    "rect": [
+     159,
+     72,
+     50,
+     12
+    ],
+    "style": 1342242816,
+    "exstyle": 0,
+    "text": ">>>>>"
+   },
+   {
+    "cls": "STATIC",
+    "cid": 1021,
+    "rect": [
+     19,
+     92,
+     295,
+     8
+    ],
+    "style": 1342308352,
+    "exstyle": 0,
+    "text": ""
+   },
+   {
+    "cls": "BUTTON",
+    "cid": 1037,
+    "rect": [
+     207,
+     3,
+     156,
+     55
+    ],
+    "style": 1342177287,
+    "exstyle": 0,
+    "text": "#Tree-View"
+   },
+   {
+    "cls": "BUTTON",
+    "cid": 1044,
+    "rect": [
+     213,
+     19,
+     142,
+     10
+    ],
+    "style": 1342242819,
+    "exstyle": 0,
+    "text": "color"
+   },
+   {
+    "cls": "BUTTON",
+    "cid": 32876,
+    "rect": [
+     213,
+     30,
+     142,
+     10
+    ],
+    "style": 1342242819,
+    "exstyle": 0,
+    "text": "U-Tree"
+   }
+  ],
+  "fmt": "old"
+ },
+ "230": {
+  "id": "230",
+  "title": "",
+  "rect": [
+   0,
+   0,
+   358,
+   44
+  ],
+  "style": 1350566988,
+  "exstyle": 0,
+  "font": "MS Shell Dlg",
+  "ctls": [
+   {
+    "cls": "STATIC",
+    "cid": 65535,
+    "rect": [
+     167,
+     9,
+     48,
+     9
+    ],
+    "style": 1073872896,
+    "exstyle": 0,
+    "text": "Speichern Als"
+   },
+   {
+    "cls": "COMBOBOX",
+    "cid": 4096,
+    "rect": [
+     221,
+     7,
+     38,
+     57
+    ],
+    "style": 1075904515,
+    "exstyle": 0,
+    "text": ""
+   },
+   {
+    "cls": "STATIC",
+    "cid": 65535,
+    "rect": [
+     7,
+     1,
+     21,
+     20
+    ],
+    "style": 1342177283,
+    "exstyle": 0,
+    "text": "@128"
+   },
+   {
+    "cls": "BUTTON",
+    "cid": 1005,
+    "rect": [
+     269,
+     7,
+     39,
+     11
+    ],
+    "style": 1073807360,
+    "exstyle": 0,
+    "text": "Laden"
+   },
+   {
+    "cls": "BUTTON",
+    "cid": 1006,
+    "rect": [
+     312,
+     7,
+     39,
+     11
+    ],
+    "style": 1073807360,
+    "exstyle": 0,
+    "text": "Speichern"
+   },
+   {
+    "cls": "BUTTON",
+    "cid": 1008,
+    "rect": [
+     262,
+     5,
+     93,
+     15
+    ],
+    "style": 1342242816,
+    "exstyle": 0,
+    "text": "..alle Spalten zeigen"
+   },
+   {
+    "cls": "STATIC",
+    "cid": 1069,
+    "rect": [
+     35,
+     7,
+     203,
+     8
+    ],
+    "style": 1342308352,
+    "exstyle": 0,
+    "text": "Verschieben Sie die Spalten bequem per Drag&&Drop"
+   },
+   {
+    "cls": "STATIC",
+    "cid": 65535,
+    "rect": [
+     9,
+     32,
+     25,
+     8
+    ],
+    "style": 1342308352,
+    "exstyle": 0,
+    "text": ".... Info "
+   }
+  ],
+  "fmt": "old"
+ },
+ "246": {
+  "id": "246",
+  "title": "Dialog",
+  "rect": [
+   0,
+   0,
+   215,
+   76
+  ],
+  "style": 2160591040,
+  "exstyle": 0,
+  "font": "MS Shell Dlg",
+  "ctls": [
+   {
+    "cls": "BUTTON",
+    "cid": 1,
+    "rect": [
+     69,
+     31,
+     56,
+     14
+    ],
+    "style": 1073807360,
+    "exstyle": 0,
+    "text": "OK"
+   },
+   {
+    "cls": "BUTTON",
+    "cid": 6,
+    "rect": [
+     11,
+     31,
+     56,
+     14
+    ],
+    "style": 1073807360,
+    "exstyle": 0,
+    "text": "&Ja"
+   },
+   {
+    "cls": "BUTTON",
+    "cid": 2,
+    "rect": [
+     76,
+     31,
+     56,
+     14
+    ],
+    "style": 1073807360,
+    "exstyle": 0,
+    "text": "A&bbrechen"
+   },
+   {
+    "cls": "BUTTON",
+    "cid": 7,
+    "rect": [
+     151,
+     31,
+     56,
+     14
+    ],
+    "style": 1073807360,
+    "exstyle": 0,
+    "text": "&Nein"
+   },
+   {
+    "cls": "BUTTON",
+    "cid": 5,
+    "rect": [
+     44,
+     31,
+     56,
+     14
+    ],
+    "style": 1073807360,
+    "exstyle": 0,
+    "text": "Ignor&ieren"
+   },
+   {
+    "cls": "BUTTON",
+    "cid": 4,
+    "rect": [
+     101,
+     31,
+     56,
+     14
+    ],
+    "style": 1073807360,
+    "exstyle": 0,
+    "text": "Wieder&holen"
+   },
+   {
+    "cls": "COMBOBOX",
+    "cid": 1018,
+    "rect": [
+     7,
+     55,
+     201,
+     58
+    ],
+    "style": 1344339971,
+    "exstyle": 0,
+    "text": ""
+   },
+   {
+    "cls": "STATIC",
+    "cid": 6000,
+    "rect": [
+     7,
+     51,
+     201,
+     1
+    ],
+    "style": 1342177296,
+    "exstyle": 0,
+    "text": ""
+   },
+   {
+    "cls": "STATIC",
+    "cid": 2001,
+    "rect": [
+     7,
+     9,
+     20,
+     20
+    ],
+    "style": 1073741827,
+    "exstyle": 32,
+    "text": "@128"
+   },
+   {
+    "cls": "STATIC",
+    "cid": 4000,
+    "rect": [
+     37,
+     8,
+     167,
+     18
+    ],
+    "style": 1342308352,
+    "exstyle": 0,
+    "text": ""
+   },
+   {
+    "cls": "BUTTON",
+    "cid": 9,
+    "rect": [
+     152,
+     31,
+     56,
+     14
+    ],
+    "style": 1073807360,
+    "exstyle": 0,
+    "text": "&Hilfe"
+   }
+  ],
+  "fmt": "ex"
+ },
+ "253": {
+  "id": "253",
+  "title": "Ordner",
+  "rect": [
+   0,
+   0,
+   208,
+   253
+  ],
+  "style": 2161049664,
+  "exstyle": 0,
+  "font": "MS Shell Dlg",
+  "ctls": [
+   {
+    "cls": "SysTreeView32",
+    "cid": 1027,
+    "rect": [
+     8,
+     16,
+     193,
+     119
+    ],
+    "style": 1350635689,
+    "exstyle": 0,
+    "text": "Tree1"
+   },
+   {
+    "cls": "STATIC",
+    "cid": 1006,
+    "rect": [
+     7,
+     208,
+     199,
+     36
+    ],
+    "style": 1073872897,
+    "exstyle": 131072,
+    "text": "Verschieben Sie die Objekte per Drag&&Drop \r\nUmbenennen mit [F2] oder Doppeltklick\nTipp: Über Eigenschaften können Sie das Symbol (Icon) ändern."
+   }
+  ],
+  "fmt": "ex"
+ },
+ "275": {
+  "id": "275",
+  "title": "",
+  "rect": [
+   0,
+   0,
+   326,
+   124
+  ],
+  "style": 2160591040,
+  "exstyle": 0,
+  "font": "MS Shell Dlg",
+  "ctls": [
+   {
+    "cls": "BUTTON",
+    "cid": 1,
+    "rect": [
+     269,
+     103,
+     50,
+     14
+    ],
+    "style": 1342242816,
+    "exstyle": 0,
+    "text": "OK"
+   },
+   {
+    "cls": "BUTTON",
+    "cid": 2,
+    "rect": [
+     196,
+     103,
+     50,
+     14
+    ],
+    "style": 1073807360,
+    "exstyle": 0,
+    "text": "esc"
+   },
+   {
+    "cls": "EDIT",
+    "cid": 1002,
+    "rect": [
+     7,
+     28,
+     312,
+     64
+    ],
+    "style": 1353781444,
+    "exstyle": 0,
+    "text": ""
+   },
+   {
+    "cls": "STATIC",
+    "cid": 65535,
+    "rect": [
+     7,
+     5,
+     254,
+     17
+    ],
+    "style": 1342308352,
+    "exstyle": 0,
+    "text": "Example:\nname=http://www.???.xx/?search=%s"
+   },
+   {
+    "cls": "STATIC",
+    "cid": 1006,
+    "rect": [
+     7,
+     99,
+     229,
+     16
+    ],
+    "style": 1342308352,
+    "exstyle": 0,
+    "text": ".."
+   },
+   {
+    "cls": "STATIC",
+    "cid": 65535,
+    "rect": [
+     239,
+     100,
+     21,
+     20
+    ],
+    "style": 1342177283,
+    "exstyle": 0,
+    "text": "@317"
+   }
+  ],
+  "fmt": "old"
+ },
+ "279": {
+  "id": "279",
+  "title": "Dialog",
+  "rect": [
+   0,
+   0,
+   623,
+   394
+  ],
+  "style": 2161049664,
+  "exstyle": 0,
+  "font": "MS Shell Dlg",
+  "ctls": [
+   {
+    "cls": "ComboBoxEx32",
+    "cid": 1053,
+    "rect": [
+     94,
+     7,
+     378,
+     80
+    ],
+    "style": 1344340226,
+    "exstyle": 0,
+    "text": ""
+   },
+   {
+    "cls": "ComboBoxEx32",
+    "cid": 1054,
+    "rect": [
+     94,
+     20,
+     377,
+     80
+    ],
+    "style": 1344340226,
+    "exstyle": 0,
+    "text": ""
+   },
+   {
+    "cls": "BUTTON",
+    "cid": 1018,
+    "rect": [
+     472,
+     7,
+     28,
+     14
+    ],
+    "style": 1342242816,
+    "exstyle": 0,
+    "text": "..."
+   },
+   {
+    "cls": "BUTTON",
+    "cid": 1256,
+    "rect": [
+     501,
+     6,
+     28,
+     14
+    ],
+    "style": 1342242816,
+    "exstyle": 0,
+    "text": "..."
+   },
+   {
+    "cls": "BUTTON",
+    "cid": 1014,
+    "rect": [
+     471,
+     20,
+     28,
+     14
+    ],
+    "style": 1342242816,
+    "exstyle": 0,
+    "text": "..."
+   },
+   {
+    "cls": "BUTTON",
+    "cid": 1257,
+    "rect": [
+     502,
+     20,
+     28,
+     14
+    ],
+    "style": 1342242816,
+    "exstyle": 0,
+    "text": "..."
+   },
+   {
+    "cls": "BUTTON",
+    "cid": 1031,
+    "rect": [
+     254,
+     43,
+     170,
+     14
+    ],
+    "style": 1342242816,
+    "exstyle": 0,
+    "text": "Compare"
+   },
+   {
+    "cls": "BUTTON",
+    "cid": 1017,
+    "rect": [
+     426,
+     43,
+     54,
+     14
+    ],
+    "style": 1342242816,
+    "exstyle": 0,
+    "text": "... DoDoDo"
+   },
+   {
+    "cls": "SysListView32",
+    "cid": 1012,
+    "rect": [
+     7,
+     84,
+     539,
+     96
+    ],
+    "style": 1350635533,
+    "exstyle": 0,
+    "text": "List1"
+   },
+   {
+    "cls": "SysListView32",
+    "cid": 1013,
+    "rect": [
+     7,
+     209,
+     536,
+     119
+    ],
+    "style": 1350635533,
+    "exstyle": 0,
+    "text": "List1"
+   },
+   {
+    "cls": "BUTTON",
+    "cid": 5005,
+    "rect": [
+     93,
+     44,
+     125,
+     10
+    ],
+    "style": 1342242819,
+    "exstyle": 0,
+    "text": "Fast-Compare"
+   },
+   {
+    "cls": "STATIC",
+    "cid": 1251,
+    "rect": [
+     7,
+     7,
+     63,
+     13
+    ],
+    "style": 1342308866,
+    "exstyle": 0,
+    "text": "Static: "
+   },
+   {
+    "cls": "STATIC",
+    "cid": 1250,
+    "rect": [
+     7,
+     21,
+     63,
+     10
+    ],
+    "style": 1342308866,
+    "exstyle": 0,
+    "text": "Static: "
+   },
+   {
+    "cls": "SysTabControl32",
+    "cid": 1061,
+    "rect": [
+     6,
+     186,
+     540,
+     145
+    ],
+    "style": 1342177792,
+    "exstyle": 0,
+    "text": "Tab1"
+   },
+   {
+    "cls": "EDIT",
+    "cid": 1001,
+    "rect": [
+     10,
+     68,
+     533,
+     12
+    ],
+    "style": 1342179456,
+    "exstyle": 0,
+    "text": ""
+   },
+   {
+    "cls": "BUTTON",
+    "cid": 5006,
+    "rect": [
+     93,
+     57,
+     208,
+     10
+    ],
+    "style": 1342242819,
+    "exstyle": 0,
+    "text": "Expert"
+   }
+  ],
+  "fmt": "old"
+ },
+ "280": {
+  "id": "280",
+  "title": "",
+  "rect": [
+   0,
+   0,
+   288,
+   13
+  ],
+  "style": 1073741896,
+  "exstyle": 0,
+  "font": "MS Shell Dlg",
+  "ctls": [],
+  "fmt": "ex"
+ },
+ "298": {
+  "id": "298",
+  "title": "",
+  "rect": [
+   0,
+   0,
+   206,
+   198
+  ],
+  "style": 1342177344,
+  "exstyle": 0,
+  "font": "MS Shell Dlg",
+  "ctls": [
+   {
+    "cls": "{8856F961-340A-11D0-A96B-00C04FD705A2}",
+    "cid": 1005,
+    "rect": [
+     0,
+     0,
+     207,
+     198
+    ],
+    "style": 1342242816,
+    "exstyle": 0,
+    "text": ""
+   }
+  ],
+  "fmt": "old"
+ },
+ "302": {
+  "id": "302",
+  "title": "Help Translate  1.0 Beta Version",
+  "rect": [
+   0,
+   0,
+   557,
+   138
+  ],
+  "style": 2161049672,
+  "exstyle": 0,
+  "font": "MS Shell Dlg",
+  "ctls": [
+   {
+    "cls": "EDIT",
+    "cid": 1002,
+    "rect": [
+     7,
+     22,
+     286,
+     12
+    ],
+    "style": 1342179456,
+    "exstyle": 0,
+    "text": ""
+   },
+   {
+    "cls": "SysListView32",
+    "cid": 1012,
+    "rect": [
+     7,
+     45,
+     440,
+     39
+    ],
+    "style": 1350631437,
+    "exstyle": 0,
+    "text": "List1"
+   },
+   {
+    "cls": "EDIT",
+    "cid": 1003,
+    "rect": [
+     7,
+     94,
+     215,
+     37
+    ],
+    "style": 1353781444,
+    "exstyle": 0,
+    "text": ""
+   },
+   {
+    "cls": "EDIT",
+    "cid": 1004,
+    "rect": [
+     228,
+     94,
+     217,
+     37
+    ],
+    "style": 1353781444,
+    "exstyle": 0,
+    "text": ""
+   },
+   {
+    "cls": "BUTTON",
+    "cid": 5005,
+    "rect": [
+     299,
+     8,
+     248,
+     8
+    ],
+    "style": 1342242819,
+    "exstyle": 0,
+    "text": "176"
+   },
+   {
+    "cls": "BUTTON",
+    "cid": 1017,
+    "rect": [
+     48,
+     7,
+     39,
+     13
+    ],
+    "style": 1342242816,
+    "exstyle": 0,
+    "text": "Save"
+   },
+   {
+    "cls": "BUTTON",
+    "cid": 1018,
+    "rect": [
+     88,
+     7,
+     39,
+     13
+    ],
+    "style": 1342242816,
+    "exstyle": 0,
+    "text": "Load"
+   },
+   {
+    "cls": "BUTTON",
+    "cid": 1019,
+    "rect": [
+     7,
+     7,
+     39,
+     13
+    ],
+    "style": 1342242816,
+    "exstyle": 0,
+    "text": "Save as"
+   },
+   {
+    "cls": "STATIC",
+    "cid": 4294967295,
+    "rect": [
+     299,
+     20,
+     248,
+     8
+    ],
+    "style": 1342308352,
+    "exstyle": 0,
+    "text": "The List-View is Editable :-)"
+   },
+   {
+    "cls": "STATIC",
+    "cid": 1006,
+    "rect": [
+     299,
+     32,
+     248,
+     10
+    ],
+    "style": 1342308352,
+    "exstyle": 0,
+    "text": "String-Update: 4.36 [53015] // 3.63 [0211] // 3.86 [0097] "
+   },
+   {
+    "cls": "COMBOBOX",
+    "cid": 1071,
+    "rect": [
+     129,
+     7,
+     154,
+     30
+    ],
+    "style": 1344340227,
+    "exstyle": 0,
+    "text": ""
+   },
+   {
+    "cls": "BUTTON",
+    "cid": 1031,
+    "rect": [
+     226,
+     30,
+     72,
+     11
+    ],
+    "style": 1342242816,
+    "exstyle": 0,
+    "text": "Goto: next-err."
+   }
+  ],
+  "fmt": "ex"
+ },
+ "304": {
+  "id": "304",
+  "title": "Dialog",
+  "rect": [
+   0,
+   0,
+   444,
+   171
+  ],
+  "style": 2160591040,
+  "exstyle": 0,
+  "font": "MS Shell Dlg",
+  "ctls": [
+   {
+    "cls": "EDIT",
+    "cid": 1002,
+    "rect": [
+     16,
+     18,
+     411,
+     79
+    ],
+    "style": 1353781444,
+    "exstyle": 0,
+    "text": ""
+   },
+   {
+    "cls": "BUTTON",
+    "cid": 1006,
+    "rect": [
+     16,
+     100,
+     99,
+     8
+    ],
+    "style": 1342242819,
+    "exstyle": 0,
+    "text": "Check2"
+   },
+   {
+    "cls": "BUTTON",
+    "cid": 1015,
+    "rect": [
+     307,
+     100,
+     62,
+     14
+    ],
+    "style": 1342242816,
+    "exstyle": 0,
+    "text": "+"
+   },
+   {
+    "cls": "BUTTON",
+    "cid": 1031,
+    "rect": [
+     371,
+     100,
+     55,
+     14
+    ],
+    "style": 1342242816,
+    "exstyle": 0,
+    "text": ""
+   },
+   {
+    "cls": "BUTTON",
+    "cid": 1,
+    "rect": [
+     253,
+     150,
+     50,
+     14
+    ],
+    "style": 1073807361,
+    "exstyle": 0,
+    "text": ""
+   },
+   {
+    "cls": "BUTTON",
+    "cid": 2,
+    "rect": [
+     387,
+     150,
+     50,
+     14
+    ],
+    "style": 1073807360,
+    "exstyle": 0,
+    "text": ""
+   },
+   {
+    "cls": "BUTTON",
+    "cid": 1052,
+    "rect": [
+     7,
+     7,
+     430,
+     163
+    ],
+    "style": 1342177287,
+    "exstyle": 0,
+    "text": "File-Filter"
+   },
+   {
+    "cls": "EDIT",
+    "cid": 1051,
+    "rect": [
+     18,
+     117,
+     408,
+     49
+    ],
+    "style": 1342244868,
+    "exstyle": 0,
+    "text": ""
+   },
+   {
+    "cls": "ComboBoxEx32",
+    "cid": 1053,
+    "rect": [
+     319,
+     152,
+     48,
+     30
+    ],
+    "style": 1344340226,
+    "exstyle": 0,
+    "text": ""
+   }
+  ],
+  "fmt": "old"
+ },
+ "310": {
+  "id": "310",
+  "title": "",
+  "rect": [
+   0,
+   0,
+   432,
+   11
+  ],
+  "style": 1073741888,
+  "exstyle": 0,
+  "font": "MS Shell Dlg",
+  "ctls": [
+   {
+    "cls": "ComboBoxEx32",
+    "cid": 1053,
+    "rect": [
+     87,
+     0,
+     265,
+     184
+    ],
+    "style": 1344340226,
+    "exstyle": 0,
+    "text": ""
+   }
+  ],
+  "fmt": "old"
+ },
+ "313": {
+  "id": "313",
+  "title": "Rename",
+  "rect": [
+   0,
+   0,
+   459,
+   298
+  ],
+  "style": 2160591040,
+  "exstyle": 0,
+  "font": "MS Shell Dlg",
+  "ctls": [
+   {
+    "cls": "EDIT",
+    "cid": 1002,
+    "rect": [
+     190,
+     7,
+     158,
+     31
+    ],
+    "style": 1353783492,
+    "exstyle": 0,
+    "text": ""
+   },
+   {
+    "cls": "EDIT",
+    "cid": 1001,
+    "rect": [
+     294,
+     7,
+     158,
+     30
+    ],
+    "style": 1353781444,
+    "exstyle": 0,
+    "text": ""
+   },
+   {
+    "cls": "SysListView32",
+    "cid": 1012,
+    "rect": [
+     7,
+     49,
+     445,
+     169
+    ],
+    "style": 1350631437,
+    "exstyle": 0,
+    "text": "List1"
+   },
+   {
+    "cls": "EDIT",
+    "cid": 1003,
+    "rect": [
+     7,
+     224,
+     445,
+     67
+    ],
+    "style": 1353781444,
+    "exstyle": 0,
+    "text": ""
+   },
+   {
+    "cls": "EDIT",
+    "cid": 1004,
+    "rect": [
+     7,
+     7,
+     181,
+     14
+    ],
+    "style": 1350631552,
+    "exstyle": 0,
+    "text": ""
+   },
+   {
+    "cls": "EDIT",
+    "cid": 1005,
+    "rect": [
+     7,
+     25,
+     181,
+     14
+    ],
+    "style": 1350631552,
+    "exstyle": 0,
+    "text": ""
+   }
+  ],
+  "fmt": "old"
+ },
+ "322": {
+  "id": "322",
+  "title": "Dialog",
+  "rect": [
+   0,
+   0,
+   478,
+   267
+  ],
+  "style": 2161049664,
+  "exstyle": 0,
+  "font": "MS Shell Dlg",
+  "ctls": [
+   {
+    "cls": "BUTTON",
+    "cid": 1,
+    "rect": [
+     421,
+     246,
+     50,
+     14
+    ],
+    "style": 1342242817,
+    "exstyle": 0,
+    "text": "OK"
+   },
+   {
+    "cls": "BUTTON",
+    "cid": 2,
+    "rect": [
+     421,
+     231,
+     50,
+     14
+    ],
+    "style": 1342242816,
+    "exstyle": 0,
+    "text": "Abbrechen"
+   }
+  ],
+  "fmt": "old"
+ },
+ "324": {
+  "id": "324",
+  "title": "Dialog",
+  "rect": [
+   0,
+   0,
+   218,
+   55
+  ],
+  "style": 2160593088,
+  "exstyle": 0,
+  "font": "MS Shell Dlg",
+  "ctls": [
+   {
+    "cls": "BUTTON",
+    "cid": 1,
+    "rect": [
+     112,
+     9,
+     84,
+     17
+    ],
+    "style": 1342242817,
+    "exstyle": 0,
+    "text": "OK"
+   },
+   {
+    "cls": "BUTTON",
+    "cid": 2,
+    "rect": [
+     22,
+     9,
+     84,
+     17
+    ],
+    "style": 1342242816,
+    "exstyle": 0,
+    "text": "Abbrechen"
+   },
+   {
+    "cls": "BUTTON",
+    "cid": 5005,
+    "rect": [
+     23,
+     32,
+     169,
+     10
+    ],
+    "style": 1342242819,
+    "exstyle": 0,
+    "text": "Check1"
+   }
+  ],
+  "fmt": "old"
+ },
+ "331": {
+  "id": "331",
+  "title": "",
+  "rect": [
+   0,
+   0,
+   186,
+   93
+  ],
+  "style": 1082130496,
+  "exstyle": 0,
+  "font": "MS Shell Dlg",
+  "ctls": [
+   {
+    "cls": "BUTTON",
+    "cid": 1,
+    "rect": [
+     129,
+     7,
+     50,
+     14
+    ],
+    "style": 1342242817,
+    "exstyle": 0,
+    "text": "OK"
+   },
+   {
+    "cls": "BUTTON",
+    "cid": 2,
+    "rect": [
+     129,
+     24,
+     50,
+     14
+    ],
+    "style": 1342242816,
+    "exstyle": 0,
+    "text": "Abbrechen"
+   }
+  ],
+  "fmt": "old"
+ },
+ "333": {
+  "id": "333",
+  "title": "Dialog",
+  "rect": [
+   0,
+   0,
+   461,
+   260
+  ],
+  "style": 2160591048,
+  "exstyle": 0,
+  "font": "MS Shell Dlg",
+  "ctls": [
+   {
+    "cls": "BUTTON",
+    "cid": 1,
+    "rect": [
+     349,
+     239,
+     50,
+     14
+    ],
+    "style": 1342242817,
+    "exstyle": 0,
+    "text": "OK"
+   },
+   {
+    "cls": "BUTTON",
+    "cid": 2,
+    "rect": [
+     404,
+     239,
+     50,
+     14
+    ],
+    "style": 1342242816,
+    "exstyle": 0,
+    "text": "Abbrechen"
+   },
+   {
+    "cls": "SysListView32",
+    "cid": 1012,
+    "rect": [
+     7,
+     70,
+     447,
+     134
+    ],
+    "style": 1350633472,
+    "exstyle": 0,
+    "text": ""
+   }
+  ],
+  "fmt": "ex"
+ },
+ "335": {
+  "id": "335",
+  "title": "Dialog",
+  "rect": [
+   0,
+   0,
+   583,
+   274
+  ],
+  "style": 2161049664,
+  "exstyle": 0,
+  "font": "MS Sans Serif",
+  "ctls": [
+   {
+    "cls": "BUTTON",
+    "cid": 1,
+    "rect": [
+     526,
+     240,
+     50,
+     14
+    ],
+    "style": 1073807361,
+    "exstyle": 0,
+    "text": "OK"
+   },
+   {
+    "cls": "BUTTON",
+    "cid": 2,
+    "rect": [
+     475,
+     241,
+     50,
+     14
+    ],
+    "style": 1073807360,
+    "exstyle": 0,
+    "text": "Abbrechen"
+   }
+  ],
+  "fmt": "ex"
+ },
+ "339": {
+  "id": "339",
+  "title": "Dialog",
+  "rect": [
+   0,
+   0,
+   405,
+   205
+  ],
+  "style": 1087111240,
+  "exstyle": 384,
+  "font": "MS Shell Dlg",
+  "ctls": [
+   {
+    "cls": "{8856F961-340A-11D0-A96B-00C04FD705A2}",
+    "cid": 1005,
+    "rect": [
+     0,
+     0,
+     398,
+     188
+    ],
+    "style": 1342242816,
+    "exstyle": 0,
+    "text": ""
+   },
+   {
+    "cls": "BUTTON",
+    "cid": 5005,
+    "rect": [
+     7,
+     193,
+     391,
+     10
+    ],
+    "style": 1342242819,
+    "exstyle": 0,
+    "text": "Aktivieren1"
+   }
+  ],
+  "fmt": "ex"
+ },
+ "340": {
+  "id": "340",
+  "title": "7EXPLORER",
+  "rect": [
+   0,
+   0,
+   573,
+   263
+  ],
+  "style": 13566024,
+  "exstyle": 4,
+  "font": "S Shell Dlg",
+  "ctls": [],
+  "fmt": "ex"
+ },
+ "342": {
+  "id": "342",
+  "title": "",
+  "rect": [
+   0,
+   0,
+   984,
+   454
+  ],
+  "style": 1073741898,
+  "exstyle": 4,
+  "font": "MS Shell Dlg",
+  "ctls": [],
+  "fmt": "ex"
+ },
+ "343": {
+  "id": "343",
+  "title": "Tool-Bar-Settings",
+  "rect": [
+   0,
+   0,
+   426,
+   268
+  ],
+  "style": 2160591040,
+  "exstyle": 0,
+  "font": "S Shell Dlg",
+  "ctls": [
+   {
+    "cls": "BUTTON",
+    "cid": 1,
+    "rect": [
+     121,
+     247,
+     50,
+     14
+    ],
+    "style": 1342242817,
+    "exstyle": 0,
+    "text": "OK"
+   },
+   {
+    "cls": "BUTTON",
+    "cid": 2,
+    "rect": [
+     171,
+     247,
+     50,
+     14
+    ],
+    "style": 1342242816,
+    "exstyle": 0,
+    "text": "Abbrechen"
+   },
+   {
+    "cls": "SysListView32",
+    "cid": 1012,
+    "rect": [
+     7,
+     59,
+     219,
+     180
+    ],
+    "style": 1350664201,
+    "exstyle": 0,
+    "text": "List1"
+   },
+   {
+    "cls": "EDIT",
+    "cid": 1002,
+    "rect": [
+     7,
+     42,
+     219,
+     14
+    ],
+    "style": 1350631552,
+    "exstyle": 0,
+    "text": ""
+   },
+   {
+    "cls": "COMBOBOX",
+    "cid": 1018,
+    "rect": [
+     57,
+     14,
+     166,
+     30
+    ],
+    "style": 1344340227,
+    "exstyle": 0,
+    "text": ""
+   },
+   {
+    "cls": "STATIC",
+    "cid": 4294967295,
+    "rect": [
+     7,
+     15,
+     47,
+     11
+    ],
+    "style": 1342308352,
+    "exstyle": 131072,
+    "text": "Tool-Bar:"
+   },
+   {
+    "cls": "STATIC",
+    "cid": 2209,
+    "rect": [
+     0,
+     30,
+     425,
+     3
+    ],
+    "style": 1342177298,
+    "exstyle": 0,
+    "text": ""
+   }
+  ],
+  "fmt": "ex"
+ },
+ "347": {
+  "id": "347",
+  "title": "",
+  "rect": [
+   0,
+   0,
+   603,
+   177
+  ],
+  "style": 1073742024,
+  "exstyle": 0,
+  "font": "MS Shell Dlg",
+  "ctls": [
+   {
+    "cls": "SysListView32",
+    "cid": 1013,
+    "rect": [
+     7,
+     144,
+     285,
+     26
+    ],
+    "style": 1082195973,
+    "exstyle": 0,
+    "text": "List1"
+   },
+   {
+    "cls": "ComboBoxEx32",
+    "cid": 1053,
+    "rect": [
+     7,
+     48,
+     208,
+     80
+    ],
+    "style": 1344340226,
+    "exstyle": 0,
+    "text": ""
+   },
+   {
+    "cls": "BUTTON",
+    "cid": 1017,
+    "rect": [
+     218,
+     46,
+     25,
+     14
+    ],
+    "style": 1342242816,
+    "exstyle": 0,
+    "text": "..."
+   },
+   {
+    "cls": "ComboBoxEx32",
+    "cid": 1054,
+    "rect": [
+     266,
+     49,
+     208,
+     80
+    ],
+    "style": 1344340226,
+    "exstyle": 0,
+    "text": ""
+   },
+   {
+    "cls": "BUTTON",
+    "cid": 1014,
+    "rect": [
+     475,
+     47,
+     25,
+     14
+    ],
+    "style": 1342242816,
+    "exstyle": 0,
+    "text": "..."
+   },
+   {
+    "cls": "STATIC",
+    "cid": 1002,
+    "rect": [
+     7,
+     33,
+     249,
+     12
+    ],
+    "style": 1342308864,
+    "exstyle": 131072,
+    "text": "Static"
+   },
+   {
+    "cls": "STATIC",
+    "cid": 1003,
+    "rect": [
+     362,
+     36,
+     234,
+     8
+    ],
+    "style": 1342308864,
+    "exstyle": 131072,
+    "text": "Static"
+   },
+   {
+    "cls": "STATIC",
+    "cid": 1004,
+    "rect": [
+     7,
+     7,
+     589,
+     15
+    ],
+    "style": 1342308865,
+    "exstyle": 131072,
+    "text": "Static"
+   },
+   {
+    "cls": "BUTTON",
+    "cid": 1031,
+    "rect": [
+     167,
+     62,
+     18,
+     14
+    ],
+    "style": 1073807360,
+    "exstyle": 0,
+    "text": "<"
+   },
+   {
+    "cls": "SysListView32",
+    "cid": 1012,
+    "rect": [
+     312,
+     143,
+     284,
+     27
+    ],
+    "style": 1350631433,
+    "exstyle": 0,
+    "text": "List1"
+   },
+   {
+    "cls": "BUTTON",
+    "cid": 1011,
+    "rect": [
+     7,
+     63,
+     50,
+     14
+    ],
+    "style": 1073807360,
+    "exstyle": 0,
+    "text": "Start"
+   },
+   {
+    "cls": "msctls_progress32",
+    "cid": 1015,
+    "rect": [
+     7,
+     22,
+     589,
+     8
+    ],
+    "style": 1350565888,
+    "exstyle": 0,
+    "text": "Progress1"
+   },
+   {
+    "cls": "BUTTON",
+    "cid": 1016,
+    "rect": [
+     63,
+     63,
+     50,
+     14
+    ],
+    "style": 1342242816,
+    "exstyle": 0,
+    "text": "Start"
+   },
+   {
+    "cls": "STATIC",
+    "cid": 1000,
+    "rect": [
+     68,
+     84,
+     19,
+     17
+    ],
+    "style": 1342312448,
+    "exstyle": 0,
+    "text": "Static"
+   },
+   {
+    "cls": "STATIC",
+    "cid": 1001,
+    "rect": [
+     109,
+     84,
+     19,
+     8
+    ],
+    "style": 1342312448,
+    "exstyle": 0,
+    "text": "Static"
+   },
+   {
+    "cls": "STATIC",
+    "cid": 1252,
+    "rect": [
+     345,
+     92,
+     20,
+     20
+    ],
+    "style": 1342177294,
+    "exstyle": 0,
+    "text": ""
+   },
+   {
+    "cls": "STATIC",
+    "cid": 1253,
+    "rect": [
+     389,
+     91,
+     20,
+     20
+    ],
+    "style": 1342177294,
+    "exstyle": 0,
+    "text": ""
+   },
+   {
+    "cls": "EDIT",
+    "cid": 1005,
+    "rect": [
+     246,
+     102,
+     40,
+     30
+    ],
+    "style": 1342179461,
+    "exstyle": 131072,
+    "text": ""
+   },
+   {
+    "cls": "BUTTON",
+    "cid": 1018,
+    "rect": [
+     218,
+     64,
+     25,
+     14
+    ],
+    "style": 1342242816,
+    "exstyle": 0,
+    "text": "...+"
+   },
+   {
+    "cls": "BUTTON",
+    "cid": 1019,
+    "rect": [
+     475,
+     64,
+     25,
+     14
+    ],
+    "style": 1342242816,
+    "exstyle": 0,
+    "text": "...+"
+   },
+   {
+    "cls": "STATIC",
+    "cid": 6001,
+    "rect": [
+     70,
+     119,
+     19,
+     9
+    ],
+    "style": 1342308865,
+    "exstyle": 0,
+    "text": "LI"
+   },
+   {
+    "cls": "STATIC",
+    "cid": 6002,
+    "rect": [
+     111,
+     119,
+     8,
+     8
+    ],
+    "style": 1342308865,
+    "exstyle": 0,
+    "text": "RI"
+   }
+  ],
+  "fmt": "ex"
+ },
+ "349": {
+  "id": "349",
+  "title": "",
+  "rect": [
+   0,
+   0,
+   325,
+   88
+  ],
+  "style": 2148008008,
+  "exstyle": 0,
+  "font": "MS Shell Dlg",
+  "ctls": [
+   {
+    "cls": "BUTTON",
+    "cid": 1,
+    "rect": [
+     209,
+     67,
+     50,
+     14
+    ],
+    "style": 1342242817,
+    "exstyle": 0,
+    "text": "OK"
+   },
+   {
+    "cls": "BUTTON",
+    "cid": 2,
+    "rect": [
+     268,
+     67,
+     50,
+     14
+    ],
+    "style": 1342242816,
+    "exstyle": 0,
+    "text": "Abbrechen"
+   }
+  ],
+  "fmt": "ex"
+ },
+ "361": {
+  "id": "361",
+  "title": "Dialog",
+  "rect": [
+   0,
+   0,
+   399,
+   265
+  ],
+  "style": 2161049664,
+  "exstyle": 0,
+  "font": "MS Shell Dlg",
+  "ctls": [],
+  "fmt": "old"
+ },
+ "370": {
+  "id": "370",
+  "title": "Dialog",
+  "rect": [
+   0,
+   0,
+   415,
+   254
+  ],
+  "style": 2160591040,
+  "exstyle": 0,
+  "font": "MS Shell Dlg",
+  "ctls": [
+   {
+    "cls": "BUTTON",
+    "cid": 1,
+    "rect": [
+     358,
+     7,
+     50,
+     14
+    ],
+    "style": 1342242817,
+    "exstyle": 0,
+    "text": "OK"
+   },
+   {
+    "cls": "BUTTON",
+    "cid": 2,
+    "rect": [
+     358,
+     24,
+     50,
+     14
+    ],
+    "style": 1342242816,
+    "exstyle": 0,
+    "text": "Abbrechen"
+   },
+   {
+    "cls": "EDIT",
+    "cid": 1001,
+    "rect": [
+     48,
+     7,
+     210,
+     14
+    ],
+    "style": 1350633600,
+    "exstyle": 0,
+    "text": ""
+   },
+   {
+    "cls": "BUTTON",
+    "cid": 1002,
+    "rect": [
+     258,
+     7,
+     18,
+     14
+    ],
+    "style": 1342242816,
+    "exstyle": 0,
+    "text": "..."
+   },
+   {
+    "cls": "{6BF52A52-394A-11D3-B153-00C04F79FAA6}",
+    "cid": 1000,
+    "rect": [
+     7,
+     30,
+     323,
+     217
+    ],
+    "style": 1342242816,
+    "exstyle": 0,
+    "text": ""
+   },
+   {
+    "cls": "STATIC",
+    "cid": 4294967295,
+    "rect": [
+     7,
+     8,
+     38,
+     9
+    ],
+    "style": 1342308352,
+    "exstyle": 0,
+    "text": "Filename:"
+   }
+  ],
+  "fmt": "ex"
+ },
+ "414": {
+  "id": "414",
+  "title": "",
+  "rect": [
+   0,
+   0,
+   357,
+   33
+  ],
+  "style": 1354761292,
+  "exstyle": 0,
+  "font": "MS Shell Dlg",
+  "ctls": [
+   {
+    "cls": "STATIC",
+    "cid": 65535,
+    "rect": [
+     4,
+     2,
+     48,
+     15
+    ],
+    "style": 1342308352,
+    "exstyle": 0,
+    "text": "Te&xt options:"
+   },
+   {
+    "cls": "COMBOBOX",
+    "cid": 4096,
+    "rect": [
+     52,
+     0,
+     123,
+     57
+    ],
+    "style": 1344339971,
+    "exstyle": 0,
+    "text": ""
+   },
+   {
+    "cls": "STATIC",
+    "cid": 65535,
+    "rect": [
+     4,
+     18,
+     48,
+     15
+    ],
+    "style": 1342308352,
+    "exstyle": 0,
+    "text": "Ico&n options:"
+   },
+   {
+    "cls": "COMBOBOX",
+    "cid": 4097,
+    "rect": [
+     52,
+     18,
+     123,
+     57
+    ],
+    "style": 1344339971,
+    "exstyle": 0,
+    "text": ""
+   },
+   {
+    "cls": "STATIC",
+    "cid": 65535,
+    "rect": [
+     329,
+     7,
+     21,
+     20
+    ],
+    "style": 1342177283,
+    "exstyle": 0,
+    "text": "@128"
+   },
+   {
+    "cls": "STATIC",
+    "cid": 65535,
+    "rect": [
+     189,
+     14,
+     92,
+     8
+    ],
+    "style": 1342308352,
+    "exstyle": 0,
+    "text": "mit Alt + Drag geht es auch :)"
+   }
+  ],
+  "fmt": "old"
+ },
+ "415": {
+  "id": "415",
+  "title": "Dialog",
+  "rect": [
+   0,
+   0,
+   526,
+   292
+  ],
+  "style": 2161049664,
+  "exstyle": 0,
+  "font": "MS Shell Dlg",
+  "ctls": [
+   {
+    "cls": "BUTTON",
+    "cid": 1,
+    "rect": [
+     7,
+     261,
+     66,
+     14
+    ],
+    "style": 1342242817,
+    "exstyle": 0,
+    "text": "OK"
+   },
+   {
+    "cls": "BUTTON",
+    "cid": 2,
+    "rect": [
+     7,
+     278,
+     66,
+     14
+    ],
+    "style": 1342242816,
+    "exstyle": 0,
+    "text": "Abbrechen"
+   },
+   {
+    "cls": "msctls_trackbar32",
+    "cid": 1001,
+    "rect": [
+     12,
+     62,
+     53,
+     11
+    ],
+    "style": 1342242840,
+    "exstyle": 0,
+    "text": "Slider1"
+   },
+   {
+    "cls": "BUTTON",
+    "cid": 65535,
+    "rect": [
+     7,
+     47,
+     69,
+     40
+    ],
+    "style": 1342177287,
+    "exstyle": 0,
+    "text": "Output ratio"
+   },
+   {
+    "cls": "BUTTON",
+    "cid": 57607,
+    "rect": [
+     7,
+     14,
+     65,
+     14
+    ],
+    "style": 1342242816,
+    "exstyle": 0,
+    "text": "Drucken"
+   },
+   {
+    "cls": "BUTTON",
+    "cid": 5005,
+    "rect": [
+     11,
+     104,
+     59,
+     10
+    ],
+    "style": 1342242819,
+    "exstyle": 0,
+    "text": "L"
+   },
+   {
+    "cls": "BUTTON",
+    "cid": 65535,
+    "rect": [
+     7,
+     91,
+     69,
+     40
+    ],
+    "style": 1342177287,
+    "exstyle": 0,
+    "text": "Print"
+   },
+   {
+    "cls": "STATIC",
+    "cid": 1055,
+    "rect": [
+     17,
+     74,
+     43,
+     8
+    ],
+    "style": 1342308352,
+    "exstyle": 0,
+    "text": "...."
+   },
+   {
+    "cls": "BUTTON",
+    "cid": 57605,
+    "rect": [
+     7,
+     29,
+     65,
+     14
+    ],
+    "style": 1342242816,
+    "exstyle": 0,
+    "text": "Pagesetup"
+   }
+  ],
+  "fmt": "old"
+ },
+ "416": {
+  "id": "416",
+  "title": "",
+  "rect": [
+   0,
+   0,
+   408,
+   230
+  ],
+  "style": 13567040,
+  "exstyle": 0,
+  "font": "MS Shell Dlg",
+  "ctls": [],
+  "fmt": "old"
+ },
+ "417": {
+  "id": "417",
+  "title": "",
+  "rect": [
+   0,
+   0,
+   286,
+   62
+  ],
+  "style": 1140850752,
+  "exstyle": 196608,
+  "font": "MS Shell Dlg",
+  "ctls": [
+   {
+    "cls": "BUTTON",
+    "cid": 5005,
+    "rect": [
+     9,
+     6,
+     222,
+     10
+    ],
+    "style": 1342242819,
+    "exstyle": 0,
+    "text": ""
+   },
+   {
+    "cls": "BUTTON",
+    "cid": 1060,
+    "rect": [
+     9,
+     18,
+     222,
+     10
+    ],
+    "style": 1342242819,
+    "exstyle": 0,
+    "text": ""
+   },
+   {
+    "cls": "BUTTON",
+    "cid": 42868,
+    "rect": [
+     9,
+     30,
+     222,
+     10
+    ],
+    "style": 1342242819,
+    "exstyle": 0,
+    "text": ""
+   },
+   {
+    "cls": "STATIC",
+    "cid": 1065,
+    "rect": [
+     247,
+     14,
+     20,
+     20
+    ],
+    "style": 1342177283,
+    "exstyle": 0,
+    "text": "@130"
+   },
+   {
+    "cls": "BUTTON",
+    "cid": 46001,
+    "rect": [
+     9,
+     42,
+     222,
+     10
+    ],
+    "style": 1342242819,
+    "exstyle": 0,
+    "text": ""
+   }
+  ],
+  "fmt": "ex"
+ },
+ "418": {
+  "id": "418",
+  "title": "",
+  "rect": [
+   0,
+   0,
+   186,
+   93
+  ],
+  "style": 1073741888,
+  "exstyle": 196608,
+  "font": "MS Shell Dlg",
+  "ctls": [],
+  "fmt": "ex"
+ },
+ "419": {
+  "id": "419",
+  "title": "Dialogfeld",
+  "rect": [
+   0,
+   0,
+   335,
+   169
+  ],
+  "style": 2160593088,
+  "exstyle": 0,
+  "font": "MS Shell Dlg",
+  "ctls": [
+   {
+    "cls": "BUTTON",
+    "cid": 2209,
+    "rect": [
+     11,
+     29,
+     311,
+     58
+    ],
+    "style": 1342177287,
+    "exstyle": 32,
+    "text": "Static"
+   },
+   {
+    "cls": "BUTTON",
+    "cid": 4031,
+    "rect": [
+     11,
+     95,
+     310,
+     41
+    ],
+    "style": 1342177287,
+    "exstyle": 32,
+    "text": "Static"
+   },
+   {
+    "cls": "BUTTON",
+    "cid": 5005,
+    "rect": [
+     17,
+     42,
+     95,
+     10
+    ],
+    "style": 1342242819,
+    "exstyle": 0,
+    "text": "Check1"
+   },
+   {
+    "cls": "BUTTON",
+    "cid": 1006,
+    "rect": [
+     118,
+     42,
+     95,
+     10
+    ],
+    "style": 1342242819,
+    "exstyle": 0,
+    "text": "Check1"
+   },
+   {
+    "cls": "BUTTON",
+    "cid": 1007,
+    "rect": [
+     219,
+     42,
+     95,
+     10
+    ],
+    "style": 1342242819,
+    "exstyle": 0,
+    "text": "Check1"
+   },
+   {
+    "cls": "BUTTON",
+    "cid": 1008,
+    "rect": [
+     17,
+     55,
+     95,
+     10
+    ],
+    "style": 1342242819,
+    "exstyle": 0,
+    "text": "Check1"
+   },
+   {
+    "cls": "BUTTON",
+    "cid": 1009,
+    "rect": [
+     118,
+     55,
+     95,
+     10
+    ],
+    "style": 1342242819,
+    "exstyle": 0,
+    "text": "Check1"
+   },
+   {
+    "cls": "BUTTON",
+    "cid": 1010,
+    "rect": [
+     17,
+     68,
+     299,
+     10
+    ],
+    "style": 1342243363,
+    "exstyle": 0,
+    "text": "Check1"
+   },
+   {
+    "cls": "BUTTON",
+    "cid": 1011,
+    "rect": [
+     17,
+     115,
+     95,
+     10
+    ],
+    "style": 1342242819,
+    "exstyle": 0,
+    "text": "Check1"
+   },
+   {
+    "cls": "BUTTON",
+    "cid": 1211,
+    "rect": [
+     119,
+     115,
+     195,
+     10
+    ],
+    "style": 1342242819,
+    "exstyle": 0,
+    "text": "Check1"
+   },
+   {
+    "cls": "BUTTON",
+    "cid": 1013,
+    "rect": [
+     219,
+     115,
+     95,
+     10
+    ],
+    "style": 1073807363,
+    "exstyle": 0,
+    "text": "Check1"
+   },
+   {
+    "cls": "BUTTON",
+    "cid": 5006,
+    "rect": [
+     15,
+     142,
+     302,
+     10
+    ],
+    "style": 1342242819,
+    "exstyle": 0,
+    "text": "Check11"
+   },
+   {
+    "cls": "SysTabControl32",
+    "cid": 1061,
+    "rect": [
+     7,
+     9,
+     321,
+     151
+    ],
+    "style": 1342177280,
+    "exstyle": 0,
+    "text": "Tab1"
+   }
+  ],
+  "fmt": "ex"
+ },
+ "432": {
+  "id": "432",
+  "title": "",
+  "rect": [
+   0,
+   0,
+   316,
+   182
+  ],
+  "style": 2148008136,
+  "exstyle": 0,
+  "font": "MS Shell Dlg",
+  "ctls": [
+   {
+    "cls": "BUTTON",
+    "cid": 1,
+    "rect": [
+     205,
+     161,
+     50,
+     14
+    ],
+    "style": 1342242817,
+    "exstyle": 0,
+    "text": "OK"
+   },
+   {
+    "cls": "BUTTON",
+    "cid": 2,
+    "rect": [
+     259,
+     161,
+     50,
+     14
+    ],
+    "style": 1342242816,
+    "exstyle": 0,
+    "text": "Abbrechen"
+   }
+  ],
+  "fmt": "ex"
+ },
+ "462": {
+  "id": "462",
+  "title": "Dialog",
+  "rect": [
+   0,
+   0,
+   731,
+   290
+  ],
+  "style": 2160591040,
+  "exstyle": 0,
+  "font": "MS Shell Dlg",
+  "ctls": [
+   {
+    "cls": "BUTTON",
+    "cid": 1,
+    "rect": [
+     674,
+     7,
+     50,
+     14
+    ],
+    "style": 1342242817,
+    "exstyle": 0,
+    "text": "OK"
+   },
+   {
+    "cls": "BUTTON",
+    "cid": 2,
+    "rect": [
+     674,
+     24,
+     50,
+     14
+    ],
+    "style": 1342242816,
+    "exstyle": 0,
+    "text": "Abbrechen"
+   },
+   {
+    "cls": "SysTabControl32",
+    "cid": 1061,
+    "rect": [
+     75,
+     39,
+     50,
+     30
+    ],
+    "style": 1342177280,
+    "exstyle": 0,
+    "text": "Tab1"
+   },
+   {
+    "cls": "SysListView32",
+    "cid": 1012,
+    "rect": [
+     279,
+     62,
+     60,
+     50
+    ],
+    "style": 1350631424,
+    "exstyle": 0,
+    "text": "List1"
+   },
+   {
+    "cls": "msctls_hotkey32",
+    "cid": 1259,
+    "rect": [
+     67,
+     92,
+     80,
+     14
+    ],
+    "style": 1350631424,
+    "exstyle": 0,
+    "text": "HotKey1"
+   }
+  ],
+  "fmt": "old"
+ },
+ "469": {
+  "id": "469",
+  "title": "Dialog",
+  "rect": [
+   0,
+   0,
+   208,
+   222
+  ],
+  "style": 2160591040,
+  "exstyle": 0,
+  "font": "MS Shell Dlg",
+  "ctls": [
+   {
+    "cls": "BUTTON",
+    "cid": 2,
+    "rect": [
+     56,
+     199,
+     77,
+     16
+    ],
+    "style": 1073807360,
+    "exstyle": 0,
+    "text": "Abbrechen"
+   },
+   {
+    "cls": "STATIC",
+    "cid": 65535,
+    "rect": [
+     180,
+     7,
+     21,
+     20
+    ],
+    "style": 1342177283,
+    "exstyle": 0,
+    "text": "@122"
+   }
+  ],
+  "fmt": "old"
+ },
+ "470": {
+  "id": "470",
+  "title": "Dialog",
+  "rect": [
+   0,
+   0,
+   677,
+   286
+  ],
+  "style": 2161049664,
+  "exstyle": 0,
+  "font": "MS Sans Serif",
+  "ctls": [],
+  "fmt": "old"
+ },
+ "472": {
+  "id": "472",
+  "title": "Dialog",
+  "rect": [
+   0,
+   0,
+   343,
+   169
+  ],
+  "style": 2160591040,
+  "exstyle": 0,
+  "font": "MS Sans Serif",
+  "ctls": [
+   {
+    "cls": "BUTTON",
+    "cid": 1,
+    "rect": [
+     286,
+     7,
+     50,
+     14
+    ],
+    "style": 1342242817,
+    "exstyle": 0,
+    "text": "OK"
+   },
+   {
+    "cls": "BUTTON",
+    "cid": 2,
+    "rect": [
+     286,
+     24,
+     50,
+     14
+    ],
+    "style": 1342242816,
+    "exstyle": 0,
+    "text": "Abbrechen"
+   },
+   {
+    "cls": "BUTTON",
+    "cid": 1031,
+    "rect": [
+     286,
+     148,
+     50,
+     14
+    ],
+    "style": 1342242816,
+    "exstyle": 0,
+    "text": "Button1"
+   },
+   {
+    "cls": "SysListView32",
+    "cid": 1012,
+    "rect": [
+     7,
+     7,
+     282,
+     71
+    ],
+    "style": 1350631937,
+    "exstyle": 0,
+    "text": "List1"
+   },
+   {
+    "cls": "SysListView32",
+    "cid": 1013,
+    "rect": [
+     7,
+     87,
+     282,
+     75
+    ],
+    "style": 1350631425,
+    "exstyle": 0,
+    "text": "List1"
+   }
+  ],
+  "fmt": "old"
+ },
+ "473": {
+  "id": "473",
+  "title": "Dialog",
+  "rect": [
+   0,
+   0,
+   412,
+   110
+  ],
+  "style": 2160591040,
+  "exstyle": 0,
+  "font": "MS Sans Serif",
+  "ctls": [
+   {
+    "cls": "BUTTON",
+    "cid": 1,
+    "rect": [
+     355,
+     20,
+     50,
+     14
+    ],
+    "style": 1342242817,
+    "exstyle": 0,
+    "text": "OK"
+   },
+   {
+    "cls": "BUTTON",
+    "cid": 2,
+    "rect": [
+     355,
+     39,
+     50,
+     14
+    ],
+    "style": 1342242816,
+    "exstyle": 0,
+    "text": "Abbrechen"
+   },
+   {
+    "cls": "msctls_progress32",
+    "cid": 1013,
+    "rect": [
+     21,
+     19,
+     326,
+     14
+    ],
+    "style": 1350565888,
+    "exstyle": 0,
+    "text": "Progress1"
+   },
+   {
+    "cls": "STATIC",
+    "cid": 1000,
+    "rect": [
+     21,
+     35,
+     321,
+     64
+    ],
+    "style": 1342308352,
+    "exstyle": 0,
+    "text": "Static"
+   }
+  ],
+  "fmt": "old"
+ }
+}

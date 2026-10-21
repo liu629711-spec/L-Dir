@@ -1,0 +1,4 @@
+target/
+*.log
+Q-Dir.ini
+start.qdr
