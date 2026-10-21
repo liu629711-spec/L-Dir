@@ -1,14 +1,11 @@
-//! 工具栏图标管线：原版 PNG 资源 → 32bpp ImageList → ToolbarWindow32。
+//! 工具栏图标管线：**自绘** 32bpp 位图（PRODUCT_SPEC R1：不使用原版 PNG）。
 //!
-//! 规格来自 REA 反编译 FUN_00429bc4（0x429bc4）：按文件名加载 PNG
-//! （z6/v6/upF/new/view/update/go/viewtree，48x48），再按命令 id 逐个挂到
-//! 主导航工具栏；dd/dd_r/dd_w（24x48）为下拉箭头。
-//! PNG 资源名是 ASCII 按 UTF-16LE 存储的，提取时显示为乱码宽串——
-//! 已规整到 assets/pngs/ 小写文件名。
+//! 8 按钮语义保留（NATIVE_SPEC 附录 A.4 确证）：z6/v6=布局索引 −1/+1、
+//! upf=弹出布局列表、new=新窗、view/update/go/viewtree=转发/刷新/下拉/树切换。
+//! 图形 = 几何 glyph（窗格方块+箭头/树形），品牌色自定（占位浅灰底）。
 //!
-//! id↔图 映射（0xA76C/6D/71/72/75/70/73 与 0xB379，FUN_00429ac0 第四参数=位）：
-//! 位0=z6(42860) 位1=v6(42861) 位2=upF(42865) 位3=new(42866) 位4=view(42869)
-//! 位5=update(42864) 位6=go(45945,SplitButton) 位7=viewtree(42867)。
+//! 历史注记：原版 FUN_00429bc4 加载 48x48 PNG；转向后资源不再复用，
+//! 但按钮顺序与命令 id 保持（工具栏是"布局体验"层）。
 
 use windows::Win32::Foundation::*;
 use windows::Win32::Graphics::Gdi::*;
@@ -17,102 +14,151 @@ use windows::Win32::UI::WindowsAndMessaging::*;
 
 use crate::core::{QError, QResult};
 
-/// 主导航按钮表：(png 文件, 命令 id, 是否 SplitButton)。
-/// 顺序 = FUN_00429bc4 数组序（原版工具栏从左到右）。
+/// 主导航按钮表：(glyph, 命令 id, 是否 SplitButton)。
+/// 顺序 = 原版 FUN_00429bc4 数组序（布局体验层，保留）。
 pub const NAV_BUTTONS: &[(&str, i32, bool)] = &[
-    ("z6.png", 0xA76C, false),
-    ("v6.png", 0xA76D, false),
-    ("upf.png", 0xA771, false),
-    ("new.png", 0xA772, false),
-    ("view.png", 0xA775, false),
-    ("update.png", 0xA770, false),
-    ("go.png", 0xB379, true), // +0x40=1：带下拉箭头（dd.png）
-    ("viewtree.png", 0xA773, false),
+    ("layout_prev", 0xA76C, false),
+    ("layout_next", 0xA76D, false),
+    ("layout_menu", 0xA771, false),
+    ("new_window", 0xA772, false),
+    ("view", 0xA775, false),
+    ("refresh", 0xA770, false),
+    ("go", 0xB379, true), // BTNS_DROPDOWN
+    ("tree_toggle", 0xA773, false),
 ];
 
-/// 内嵌 PNG（assets/pngs 小写名 → 原版资源）。
-pub fn png_bytes(name: &str) -> Option<&'static [u8]> {
-    let table: &[(&str, &[u8])] = &[
-        ("z6.png", include_bytes!("../../assets/pngs/z6.png")),
-        ("v6.png", include_bytes!("../../assets/pngs/v6.png")),
-        ("upf.png", include_bytes!("../../assets/pngs/upf.png")),
-        ("new.png", include_bytes!("../../assets/pngs/new.png")),
-        ("view.png", include_bytes!("../../assets/pngs/view.png")),
-        ("update.png", include_bytes!("../../assets/pngs/update.png")),
-        ("go.png", include_bytes!("../../assets/pngs/go.png")),
-        ("viewtree.png", include_bytes!("../../assets/pngs/viewtree.png")),
-        ("plus.png", include_bytes!("../../assets/pngs/plus.png")),
-        ("dd.png", include_bytes!("../../assets/pngs/dd.png")),
-        ("dd_r.png", include_bytes!("../../assets/pngs/dd_r.png")),
-        ("dd_w.png", include_bytes!("../../assets/pngs/dd_w.png")),
-    ];
-    let key = name.to_ascii_lowercase();
-    table.iter().find(|(k, _)| *k == key).map(|(_, b)| *b)
+/// glyph 名 → 48x48 BGRA 像素（全不透明；ImageList 用负高度=自上而下）。
+pub fn glyph_bits(name: &str) -> Vec<u8> {
+    const S: usize = 48;
+
+    struct Pen {
+        px: [u8; S * S * 4],
+    }
+    impl Pen {
+        fn new() -> Self {
+            Pen { px: [0; S * S * 4] }
+        }
+        fn set(&mut self, x: i32, y: i32, rgba: [u8; 4]) {
+            if (0..S as i32).contains(&x) && (0..S as i32).contains(&y) {
+                let o = (y as usize) * S * 4 + (x as usize) * 4;
+                self.px[o] = rgba[2];
+                self.px[o + 1] = rgba[1];
+                self.px[o + 2] = rgba[0];
+                self.px[o + 3] = rgba[3];
+            }
+        }
+        fn fill(&mut self, x0: i32, y0: i32, w: i32, h: i32, c: [u8; 4]) {
+            for y in y0..(y0 + h) {
+                for x in x0..(x0 + w) {
+                    self.set(x, y, c);
+                }
+            }
+        }
+        fn outline(&mut self, x0: i32, y0: i32, w: i32, h: i32, c: [u8; 4]) {
+            for i in 0..w {
+                self.set(x0 + i, y0, c);
+                self.set(x0 + i, y0 + h - 1, c);
+            }
+            for j in 0..h {
+                self.set(x0, y0 + j, c);
+                self.set(x0 + w - 1, y0 + j, c);
+            }
+        }
+    }
+
+    let bg: [u8; 4] = [245, 245, 245, 255];
+    let line: [u8; 4] = [70, 110, 170, 255];
+    let accent: [u8; 4] = [210, 130, 40, 255];
+    let mut pen = Pen::new();
+    pen.fill(0, 0, 48, 48, bg);
+    match name {
+        "layout_prev" | "layout_next" => {
+            pen.outline(12, 6, 10, 10, line);
+            pen.outline(26, 6, 10, 10, line);
+            pen.outline(12, 20, 10, 10, line);
+            pen.outline(26, 20, 10, 10, line);
+            let next = name == "layout_next";
+            for i in 0..8i32 {
+                let x = if next { 8 + i } else { 38 - i };
+                let y = 44 - (if next { i } else { 7 - i });
+                pen.set(x, y, accent);
+                pen.set(x, y - 1, accent);
+            }
+        }
+        "layout_menu" => {
+            pen.fill(10, 12, 28, 4, line);
+            pen.fill(10, 22, 28, 4, line);
+            pen.fill(10, 32, 28, 4, line);
+        }
+        "new_window" => {
+            pen.outline(8, 12, 22, 22, line);
+            pen.fill(9, 13, 20, 20, bg);
+            pen.outline(20, 18, 20, 20, accent);
+        }
+        "view" => {
+            for x in 8..40i32 {
+                let t = x - 24;
+                let dy = (16 - t * t / 8).max(0);
+                pen.set(x, 24 - dy / 2, line);
+                pen.set(x, 24 + dy / 2, line);
+            }
+            pen.fill(22, 20, 4, 8, accent);
+        }
+        "refresh" => {
+            for x in 10..38i32 {
+                let t = (x - 24) as i64;
+                let d = t * t / 16;
+                pen.set(x, 10 + d as i32, line);
+                pen.set(x, 38 - d as i32, line);
+            }
+            pen.fill(32, 6, 6, 6, accent);
+        }
+        "go" => {
+            for i in 0..14i32 {
+                for j in 0..(14 - i) {
+                    pen.set(14 + i, 10 + j, line);
+                }
+            }
+        }
+        "tree_toggle" => {
+            pen.fill(10, 8, 3, 32, line);
+            pen.fill(13, 12, 16, 3, line);
+            pen.fill(13, 24, 24, 3, line);
+            pen.fill(13, 34, 8, 3, line);
+            pen.fill(30, 8, 6, 6, accent);
+        }
+        _ => {
+            for i in 0..48i32 {
+                pen.set(i, i, line);
+            }
+        }
+    }
+    pen.px.to_vec()
 }
 
-/// PNG 字节 → (w, h, BGRA 自上而下)。
-pub fn png_to_bgra(bytes: &[u8]) -> QResult<(u32, u32, Vec<u8>)> {
-    let img = image::load_from_memory_with_format(bytes, image::ImageFormat::Png)
-        .map_err(|e| QError::Config { key: "png".into(), msg: format!("解码失败: {e}") })?
-        .to_rgba8();
-    let (w, h) = img.dimensions();
-    let mut bgra = vec![0u8; (w as usize) * (h as usize) * 4];
-    for (i, px) in img.pixels().enumerate() {
-        let o = i * 4;
-        bgra[o] = px[2];
-        bgra[o + 1] = px[1];
-        bgra[o + 2] = px[0];
-        bgra[o + 3] = px[3];
-    }
-    Ok((w, h, bgra))
-}
-
-/// PNG → 32bpp 带 alpha 掩码的 ImageList。
-///
-/// 全部 PNG 按各自原尺寸直接加入（原版 ImageList 尺寸取最大项）；
-/// 尺寸不一致时 ImageList 会居中绘制，无需预缩放。
-pub unsafe fn imagelist_from_pngs(names: &[&str]) -> QResult<HIMAGELIST> {
-    let mut pngs: Vec<Vec<u8>> = Vec::new();
-    let (mut max_w, mut max_h) = (16u32, 16u32);
-    for n in names {
-        let bytes = png_bytes(n).ok_or_else(|| QError::Config { key: "png".into(), msg: format!("资源缺失: {n}") })?;
-        let (w, h, bgra) = png_to_bgra(bytes)?;
-        max_w = max_w.max(w);
-        max_h = max_h.max(h);
-        pngs.push(bgra);
-        // 尺寸与元信息一并传递：用 (w,h) 前缀存进 Vec 不便，改为重解一次。
-        let _ = (w, h);
-    }
-    let himl = unsafe {
-        ImageList_Create(
-            max_w as i32,
-            max_h as i32,
-            ILC_COLOR32 | ILC_MASK,
-            pngs.len() as i32,
-            0,
-        )
-    };
+/// glyph 名列表 → 48x48 ImageList。
+pub unsafe fn imagelist_from_glyphs(names: &[&str]) -> QResult<HIMAGELIST> {
+    let himl = unsafe { ImageList_Create(48, 48, ILC_COLOR32 | ILC_MASK, names.len() as i32, 0) };
     if himl.is_invalid() {
         return Err(QError::Shell("ImageList_Create 失败".into()));
     }
-    for (n, bgra) in names.iter().zip(pngs.iter()) {
-        let bytes = png_bytes(n).unwrap();
-        let (w, h, _) = png_to_bgra(bytes)?;
+    for n in names {
+        let bits = glyph_bits(n);
         let mut bmi = BITMAPINFO::default();
         bmi.bmiHeader = BITMAPINFOHEADER {
             biSize: core::mem::size_of::<BITMAPINFOHEADER>() as u32,
-            biWidth: w as i32,
-            biHeight: -(h as i32),
+            biWidth: 48,
+            biHeight: -48,
             biPlanes: 1,
             biBitCount: 32,
             biCompression: BI_RGB.0 as u32,
             ..Default::default()
         };
-        let mut bits: *mut core::ffi::c_void = std::ptr::null_mut();
-        let hbm = unsafe { CreateDIBSection(None, &bmi, DIB_RGB_COLORS, &mut bits, None, 0) }
+        let mut ptr: *mut core::ffi::c_void = std::ptr::null_mut();
+        let hbm = unsafe { CreateDIBSection(None, &bmi, DIB_RGB_COLORS, &mut ptr, None, 0) }
             .map_err(|e| QError::Shell(format!("CreateDIBSection: {e}")))?;
         unsafe {
-            std::ptr::copy_nonoverlapping(bgra.as_ptr(), bits as *mut u8, bgra.len());
+            std::ptr::copy_nonoverlapping(bits.as_ptr(), ptr as *mut u8, bits.len());
             let _ = ImageList_Add(himl, hbm, None);
             let _ = DeleteObject(HGDIOBJ(hbm.0));
         }
@@ -120,14 +166,14 @@ pub unsafe fn imagelist_from_pngs(names: &[&str]) -> QResult<HIMAGELIST> {
     Ok(himl)
 }
 
-/// 建原版主导航工具栏（48x48 图标 + 8 个布局切换按钮，go 带下拉箭头）。
+/// 建主导航工具栏（48x48 glyph + 8 按钮，go 带下拉箭头）。
 pub unsafe fn build_nav_toolbar(
     parent: HWND,
     hinstance: HINSTANCE,
     id: i32,
 ) -> QResult<(HWND, HIMAGELIST)> {
     let names: Vec<&str> = NAV_BUTTONS.iter().map(|(n, _, _)| *n).collect();
-    let himl = unsafe { imagelist_from_pngs(&names) }?;
+    let himl = unsafe { imagelist_from_glyphs(&names) }?;
 
     let tb = unsafe {
         CreateWindowExW(
@@ -170,7 +216,7 @@ pub unsafe fn build_nav_toolbar(
     let btns: Vec<TBBUTTON> = NAV_BUTTONS
         .iter()
         .enumerate()
-        .map(|(i, (_png, cid, split))| TBBUTTON {
+        .map(|(i, (_glyph, cid, split))| TBBUTTON {
             iBitmap: i as i32,
             idCommand: *cid,
             fsState: TBSTATE_ENABLED as u8,
@@ -187,4 +233,28 @@ pub unsafe fn build_nav_toolbar(
         );
     }
     Ok((tb, himl))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn glyph_尺寸与表一致() {
+        for (n, _, _) in NAV_BUTTONS {
+            let bits = glyph_bits(n);
+            assert_eq!(bits.len(), 48 * 48 * 4, "glyph {n}");
+            // 全不透明
+            assert!(bits.iter().skip(3).step_by(4).all(|&a| a == 255), "glyph {n}");
+        }
+    }
+
+    #[test]
+    fn glyph_未知名走对角线占位() {
+        let bits = glyph_bits("nope");
+        assert_eq!(bits.len(), 48 * 48 * 4);
+        // 对角线上有主色线（G=110 在 index o+1）
+        let o = (10 * 48 + 10) * 4;
+        assert_eq!(bits[o], 170); // B of line color
+    }
 }

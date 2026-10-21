@@ -31,7 +31,7 @@ use crate::ui::pane::{NavKind, PaneEvent, RowPaint, Textures, format_filetime, i
 
 /// 窗口默认尺寸（Q-Dir.ini `WinRC=0;0;800;600`）。
 pub const DEFAULT_WINDOW_SIZE: [f32; 2] = [800.0, 600.0];
-pub const WINDOW_TITLE: &str = "Q-Dir";
+pub const WINDOW_TITLE: &str = crate::brand::PRODUCT_NAME;
 
 /// 窗格数布局模式（原版「窗口」菜单的 1-4 窗格切换）。
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -426,7 +426,7 @@ impl QDirApp {
             }
             ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
                 ui.label(format!(
-                    "Q-Dir v12 {} msek",
+                    "L-Dir v0 {} msek",
                     now_ms().saturating_sub(self.start_ms)
                 ));
             });

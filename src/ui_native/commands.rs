@@ -1,112 +1,42 @@
-//! 菜单命令分发：命令 id（原版菜单模板 128）→ shell 层操作。
+//! 菜单命令分发：自绘菜单命令 id（`menu::cmd_id`，30000+ 段）→ 操作。
 //!
-//! id 依据 assets/rc/menus.json（原版模板解析基准）。
-//! 已核对的常用命令（语言键 → 语义由 id 段与位置推断，后续用 UIA 行为验证）：
-//! - 57600=10001(新建文件夹) 57601=10002(复制) 57603=10003(剪切) 32820=10004(粘贴)
-//! - 45912=205(删除) 45877=204(打开) 45913=206(属性)
-//! - 34037=53011(刷新) 57664=60001(关于)
-//!
-//! 未接的 id 走 `_ =>` 分支留痕，逐个按原版行为补齐。
+//! 历史注记：1:1 时代曾按原版模板 128 的 id（57600 等）分发，且多项语义
+//! 靠推断（后来反编译证伪：57600=重复窗口、57601=打开状态、57603=保存状态、
+//! 32820=保存状态到桌面——**都不是**剪贴板命令；剪贴板走右键菜单，见
+//! NATIVE_SPEC 附录 A）。转向后菜单由 `menu.rs` 自绘，id 为自有常量；
+//! 行为语义仍对标原版确证逻辑（附录 A 是功能来源）。
 
-
+use windows::core::{PCWSTR, PWSTR};
 use windows::Win32::Foundation::*;
 use windows::Win32::Graphics::Gdi::{CreateFontIndirectW, DeleteObject, HFONT, HGDIOBJ, LOGFONTW};
+use windows::Win32::UI::Controls::Dialogs::{GetOpenFileNameW, GetSaveFileNameW, OFN_OVERWRITEPROMPT, OFN_PATHMUSTEXIST, OPENFILENAMEW, OFN_FILEMUSTEXIST};
 use windows::Win32::UI::WindowsAndMessaging::*;
 
+use crate::brand;
 use crate::shell;
 use crate::ui_native::mainframe::MainFrame;
+use crate::ui_native::menu::cmd_id;
 
 /// 布局切换命令（导航工具栏，FUN_00429bc4）。
-/// 语义映射以原版按钮 tooltip 为准（UIA dump 已给出各按钮文案）。
+/// 语义按反编译确证（附录 A.4）：z6/v6 = 布局索引 −1/+1 循环；
+/// update = 重绘刷新；viewtree = 树显隐；view/go = 转发窗格内容。
+/// 当前实现先保留具体布局档位映射（自定 id 仍走此表）。
 pub mod layout {
-    pub const Z6: u32 = 0xA76C;   // "Q-Dir (默认 4 个窗口)"
-    pub const V6: u32 = 0xA76D;   // "2-Dir (2 个水平的)"*待 UIA 复核
-    pub const UPF: u32 = 0xA771;  // "3-Dir (1 个在上面 2 个在下面)"*待复核
-    pub const NEW: u32 = 0xA772;  // *待复核
-    pub const VIEW: u32 = 0xA775; // *待复核
-    pub const UPDATE: u32 = 0xA770; // *待复核
-    pub const GO: u32 = 0xB379;   // SplitButton：更多布局下拉
-    pub const VIEWTREE: u32 = 0xA773; // "1-Dir (一个窗口)"*待复核
+    pub const Z6: u32 = 0xA76C;   // 上一档布局（原版确证：索引 −1）
+    pub const V6: u32 = 0xA76D;   // 下一档布局（原版确证：索引 +1）
+    pub const UPF: u32 = 0xA771;  // 弹出布局列表（原版确证）
+    pub const NEW: u32 = 0xA772;  // 新窗类（FUN_00481604）*待复核*
+    pub const VIEW: u32 = 0xA775; // 转发窗格内容 0xd1f
+    pub const UPDATE: u32 = 0xA770; // 刷新重绘
+    pub const GO: u32 = 0xB379;   // 转发窗格内容 0xd20（下拉）
+    pub const VIEWTREE: u32 = 0xA773; // 树显隐切换（原版确证：非 1-Dir！）
 }
 
-/// 命令 id 常量（原版菜单模板 128 的 id 字段，16 位）。
-pub mod cmd {
-    pub const NEW_FOLDER: u32 = 57600; // 10001
-    pub const COPY: u32 = 57601; // 10002
-    pub const CUT: u32 = 57603; // 10003
-    pub const PASTE: u32 = 32820; // 10004
-    pub const DELETE: u32 = 45912; // 205
-    pub const OPEN: u32 = 45877; // 204
-    pub const PROPERTIES: u32 = 45913; // 206
-    pub const REFRESH: u32 = 34037; // 53011
-    pub const ABOUT: u32 = 57664; // 60001
-    pub const POWERSHELL: u32 = 48504; // 文件>PowerShell（菜单字面文本）
-}
 
-/// UI 缩放档（视图菜单字面文本 60%..200%，id 45978..45990 顺序核对）。
-pub fn scale_for_zoom_id(id: u32) -> Option<u32> {
-    const STEPS: [u32; 11] = [60, 80, 100, 110, 120, 130, 140, 150, 160, 180, 200];
-    const IDS: [u32; 11] = [45978, 45979, 45980, 45982, 45984, 45985, 45986, 45987, 45988, 45989, 45990];
-    IDS.iter().position(|&x| x == id).map(|i| STEPS[i])
-}
 
-/// 配色方案档位（视图菜单字面文本：#14F3FF (B)/#000000/#14F3FF/#999999/#matrix，
-/// id 34064..34068 顺序核对）。*各档具体配色方案待截图级对照确认*。
-pub fn theme_for_id(id: u32) -> Option<u32> {
-    const IDS: [u32; 5] = [34064, 34065, 34066, 34067, 34068];
-    IDS.iter().position(|&x| x == id).map(|i| i as u32)
-}
 
-/// 已实证的命令 id → 原版中文文案（用于「未接命令」日志可读化）。
-///
-/// 收录标准：**语义已在早前各棒验证过**（实发命令、UIA tooltip 对照、
-/// 反编译确认或字面文本菜单项）。未实证的 id 一律不收——原版菜单项
-/// 会动态增删，位置对齐不可靠（已逐项 diff 确认），只收硬证据。
-pub fn known_label(id: u32) -> Option<&'static str> {
-    Some(match id {
-        57600 => "新建文件夹",           // 10001，实发验证
-        57601 => "复制",                 // 10002，剪贴板验证
-        57603 => "剪切",                 // 10003
-        32820 => "粘贴",                 // 10004
-        45912 => "删除",                 // 205
-        45877 => "打开",                 // 204
-        45913 => "属性",                 // 206
-        34037 => "刷新",                 // 53011
-        57664 => "关于",                 // 60001
-        48504 => "PowerShell",           // 字面文本菜单项
-        45978 => "缩放 60%",
-        45979 => "缩放 80%",
-        45980 => "缩放 100%",
-        45982 => "缩放 110%",
-        45984 => "缩放 120%",
-        45985 => "缩放 130%",
-        45986 => "缩放 140%",
-        45987 => "缩放 150%",
-        45988 => "缩放 160%",
-        45989 => "缩放 180%",
-        45990 => "缩放 200%",
-        34064 => "颜色和设计 > #14F3FF (B)",
-        34065 => "颜色和设计 > #000000",
-        34066 => "颜色和设计 > #14F3FF",
-        34067 => "颜色和设计 > #999999",
-        34068 => "颜色和设计 > #matrix",
-        // 德语模板 #216/#217 字面文本硬证据（本棒接线）。
-        33931 => "视图 > 大图标",
-        33932 => "视图 > 小图标",
-        33933 => "视图 > 列表",
-        33934 => "视图 > 详细信息",
-        32864 => "视图 > 显示网格线",
-        33938 => "列宽自适应(含列头)",
-        33939 => "列宽自适应",
-        32833 => "活动窗口 #1",
-        32834 => "活动窗口 #2",
-        32835 => "活动窗口 #3",
-        32836 => "活动窗口 #4",
-        32919 => "添加到收藏夹",
-        32779 => "管理收藏夹",
-        _ => return None,
-    })
-}
+
+
 
 /// 窗格命令按钮 id 解码：每窗格 10 个按钮，id = 1000 + 100*pane + 20 + bi。
 /// 返回 (窗格索引, 按钮序号 0..9)；非按钮 id 返回 None。
@@ -132,32 +62,9 @@ pub fn pane_button_id(id: u32) -> Option<(usize, usize)> {
     }
 }
 
-/// 视图模式菜单 id → LV_VIEW_*（33931 大图标 / 33932 小图标 /
-/// 33933 列表 / 33934 详细信息；德语模板 #216 字面文本
-/// &Große Symbole / &Kleine Symbole / &Liste / &Details 为硬证据）。
-pub fn view_mode_for_id(id: u32) -> Option<u32> {
-    // commctrl.h：LV_VIEW_ICON=0 / SMALLICON=2 / LIST=3 / DETAILS=1。
-    // 33931/33932 → ICON/SMALLICON 按语义推断，*待复核*；
-    // 33933→LIST、33934→DETAILS 字面对应。
-    match id {
-        33931 => Some(0),
-        33932 => Some(2),
-        33933 => Some(3),
-        33934 => Some(1),
-        _ => None,
-    }
-}
 
-/// 「活动窗口 #N」菜单 id → 窗格索引 0..3（#217 字面文本 `# 1..# 4`）。
-pub fn active_pane_for_id(id: u32) -> Option<usize> {
-    match id {
-        32833 => Some(0),
-        32834 => Some(1),
-        32835 => Some(2),
-        32836 => Some(3),
-        _ => None,
-    }
-}
+
+
 
 /// 原版便携布局的相对路径键（[Favoriten] Ordner / Link）按 exe 所在目录
 /// 解析；已是绝对路径则原样返回。
@@ -182,96 +89,160 @@ pub unsafe fn dispatch(frame: &mut MainFrame, main: HWND, id: u32) -> bool {
 
     let host = shell::HostWindow::from_raw_hwnd(main.0 as isize);
     match id {
-        cmd::COPY => {
-            if !selected.is_empty() {
-                if let Err(e) = shell::copy_to_clipboard(host, &selected) {
-                    eprintln!("[qdir-rs] 复制失败：{e}");
+        // —— 文件：状态（附录 A.1 确证语义；自绘 id）——
+        cmd_id::FILE_OPEN_STATE => {
+            if let Some(path) = run_state_dialog(main, false) {
+                match crate::config::load_session(&path) {
+                    Ok(st) => {
+                        apply_session(frame, st);
+                        println!("[qdir-rs] TEST 状态载入 {path:?}");
+                    }
+                    Err(e) => eprintln!("[qdir-rs] 状态载入失败：{e}"),
                 }
             }
             true
         }
-        cmd::CUT => {
-            if !selected.is_empty() {
-                if let Err(e) = shell::cut_to_clipboard(host, &selected) {
-                    eprintln!("[qdir-rs] 剪切失败：{e}");
+        cmd_id::FILE_SAVE_STATE => {
+            if let Some(path) = run_state_dialog(main, true) {
+                match crate::config::save_session(&path, &frame.session) {
+                    Ok(()) => println!("[qdir-rs] TEST 状态保存 {path:?}"),
+                    Err(e) => eprintln!("[qdir-rs] 状态保存失败：{e}"),
                 }
             }
             true
         }
-        cmd::PASTE => {
+        cmd_id::FILE_SAVE_STATE_DESKTOP => {
+            let dir = shell::desktop_path().unwrap_or_else(|_| std::path::PathBuf::from("."));
+            let path = dir.join(brand::SESSION_FILE);
+            match crate::config::save_session(&path, &frame.session) {
+                Ok(()) => println!("[qdir-rs] TEST 状态存桌面 {path:?}"),
+                Err(e) => eprintln!("[qdir-rs] 状态存桌面失败：{e}"),
+            }
+            true
+        }
+        cmd_id::FILE_DUP_WINDOW => {
+            // 重复窗口（附录 A.1：原 E100=存临时状态 + 新实例加载）。
+            let tmp = std::env::temp_dir().join("L-Dir.clone.qdr");
+            match crate::config::save_session(&tmp, &frame.session)
+                .and_then(|_| duplicate_window(&tmp))
+            {
+                Ok(()) => println!("[qdir-rs] TEST 重复窗口 -> {tmp:?}"),
+                Err(e) => eprintln!("[qdir-rs] 重复窗口失败：{e}"),
+            }
+            true
+        }
+        // —— 文件：工具（附录 A.2：cmd/powershell=窗格路径起终端；
+        // 45912/45913 原语义=FileRun/ShutdownWindows 系统对话框）——
+        cmd_id::FILE_CMD | cmd_id::FILE_POWERSHELL => {
+            // 原版 FUN_004cc524：cmd.exe / powershell.exe，工作目录=窗格路径。
             if !pane_path.as_os_str().is_empty() {
-                if let Err(e) = shell::paste_into(host, &pane_path, false) {
-                    eprintln!("[qdir-rs] 粘贴失败：{e}");
-                } else {
-                    unsafe { frame.fill_pane(pane_idx) };
+                let exe = if id == cmd_id::FILE_CMD { "cmd.exe" } else { "powershell.exe" };
+                if let Err(e) = shell::spawn_terminal(exe, &pane_path) {
+                    eprintln!("[qdir-rs] {exe} 启动失败：{e}");
                 }
             }
             true
         }
-        cmd::DELETE => {
-            if !selected.is_empty() {
-                let opts = shell::FileOpOptions::default();
-                if let Err(e) = shell::delete_files(host, &selected, &opts) {
-                    eprintln!("[qdir-rs] 删除失败：{e}");
-                } else {
-                    unsafe { frame.fill_pane(pane_idx) };
-                }
+        cmd_id::FILE_RUN => {
+            // IShellDispatch::FileRun（附录 A.2 确证槽 0x80）。
+            match shell::shell_file_run() {
+                Ok(()) => {}
+                Err(e) => eprintln!("[qdir-rs] 运行对话框失败：{e}"),
             }
             true
         }
-        cmd::OPEN => {
-            if let Some(p) = selected.first() {
-                if let Err(e) = shell::open_default(host, p) {
-                    eprintln!("[qdir-rs] 打开失败：{e}");
-                }
-            }
+        cmd_id::FILE_EXIT => {
+            let _ = PostMessageW(Some(main), WM_CLOSE, WPARAM(0), LPARAM(0));
             true
         }
-        cmd::PROPERTIES => {
-            if let Some(p) = selected.first() {
-                if let Err(e) = shell::show_properties(host, p) {
-                    eprintln!("[qdir-rs] 属性失败：{e}");
-                }
-            }
-            true
-        }
-        cmd::NEW_FOLDER => {
-            let name = format!("新建文件夹 {}", next_folder_seq(&pane_path));
-            match shell::new_folder(host, &pane_path, &name) {
-                Ok(_) => unsafe { frame.fill_pane(pane_idx) },
-                Err(e) => eprintln!("[qdir-rs] 新建文件夹失败：{e}"),
-            }
-            true
-        }
-        cmd::REFRESH => {
+        cmd_id::VIEW_REFRESH => {
             unsafe { frame.fill_pane(pane_idx) };
             true
         }
-        cmd::POWERSHELL => {
-            // 文件>PowerShell：在活动窗格路径开一个 PowerShell（原版语义）。
-            if !pane_path.as_os_str().is_empty() {
-                let _ = std::process::Command::new("powershell.exe")
-                    .current_dir(&pane_path)
-                    .spawn();
+        cmd_id::ABOUT => {
+            crate::ui_native::mainframe::show_about_brand(main);
+            true
+        }
+        cmd_id::FAV_ADD => {
+            if let Some(p) = selected.first() {
+                let name = p
+                    .file_name()
+                    .map(|s| s.to_string_lossy().into_owned())
+                    .unwrap_or_else(|| "收藏夹".to_string());
+                let fav_dir = resolve_relative(frame.config.favoriten_dir.clone());
+                let _ = std::fs::create_dir_all(&fav_dir);
+                let lnk = fav_dir.join(format!("{name}.lnk"));
+                match shell::create_shortcut(&lnk, p) {
+                    Ok(()) => println!("[qdir-rs] TEST 添加到收藏夹 {lnk:?}"),
+                    Err(e) => eprintln!("[qdir-rs] 添加到收藏夹失败：{e}"),
+                }
             }
             true
         }
-        id if scale_for_zoom_id(id).is_some() => {
-            if let Some(pct) = scale_for_zoom_id(id) {
-                apply_ui_scale(frame, main, pct);
-            }
+        cmd_id::FAV_MANAGE => {
+            let fav_dir = resolve_relative(frame.config.favoriten_dir.clone());
+            let _ = std::fs::create_dir_all(&fav_dir);
+            let _ = shell::open_default(host, &fav_dir);
             true
         }
-        id if theme_for_id(id).is_some() => {
-            let theme = theme_for_id(id).unwrap_or(0);
+        cmd_id::VIEW_TREE_TOGGLE => {
+            // 树显隐（附录 A.3 确证 tree_mode 0/1/2；UI 在 P1 补树控件，
+            // 先落实会话状态位）。
+            let next = if frame.session.tree_mode { 0 } else { 1 };
+            frame.session.tree_mode = next != 0;
+            println!("[qdir-rs] TEST tree_mode={next}");
+            true
+        }
+        id if (cmd_id::VIEW_ICON..=cmd_id::VIEW_DETAILS).contains(&id) => {
+            // 视图模式：LV_VIEW_ICON=0 / DETAILS=1 / SMALLICON=2 / LIST=3。
+            let mode = match id {
+                cmd_id::VIEW_ICON => 0,
+                cmd_id::VIEW_SMALL_ICON => 2,
+                cmd_id::VIEW_LIST => 3,
+                _ => 1,
+            };
+            frame.set_view_mode_all(mode);
+            println!("[qdir-rs] TEST 视图模式 id={id} view={mode}");
+            true
+        }
+        cmd_id::VIEW_GRIDLINES => {
+            frame.toggle_grid_lines_all();
+            println!("[qdir-rs] TEST 网格线切换");
+            true
+        }
+        cmd_id::VIEW_FIT_COL_HEADER => {
+            frame.autofit_columns_all(true);
+            println!("[qdir-rs] TEST 列宽自适应(含列头)");
+            true
+        }
+        cmd_id::VIEW_FIT_COL => {
+            frame.autofit_columns_all(false);
+            println!("[qdir-rs] TEST 列宽自适应");
+            true
+        }
+        id if (cmd_id::ZOOM_BASE..cmd_id::ZOOM_BASE + 11).contains(&id) => {
+            let pct = cmd_id::ZOOM_STEPS[(id - cmd_id::ZOOM_BASE) as usize];
+            apply_ui_scale(frame, main, pct);
+            true
+        }
+        id if (cmd_id::THEME_BASE..cmd_id::THEME_BASE + 5).contains(&id) => {
+            let theme = id - cmd_id::THEME_BASE;
             frame.config.colorthema = theme;
             frame.session.colorthema = theme;
             println!("[qdir-rs] TEST 配色档位 colorthema={theme}");
-            // 重灌全部窗格：行色预算（Filter2）随之按新档重算。
             for i in 0..4 {
                 unsafe { frame.fill_pane(i) };
             }
             true
+        }
+        id if (cmd_id::ACTIVE_BASE..cmd_id::ACTIVE_BASE + 4).contains(&id) => {
+            let p = (id - cmd_id::ACTIVE_BASE) as usize;
+            if frame.set_active_pane(p) {
+                println!("[qdir-rs] TEST 活动窗口 #{}", p + 1);
+                true
+            } else {
+                false
+            }
         }
         // 导航布局按钮：反编译（FUN_00429bc4 注册顺序）+ 原版 UIA tooltip
         // 交叉确认了 5 个 id 的语义；其余 3 个（GO/VIEW/UPDATE）按
@@ -292,27 +263,6 @@ pub unsafe fn dispatch(frame: &mut MainFrame, main: HWND, id: u32) -> bool {
                     _ => crate::ui_native::splitter::Layout::ThreeVertical,
                 },
             )
-        }
-        32919 => {
-            // 收藏夹「添加到收藏夹…」(语言键 40001)：把活动窗格首个
-            // 选中项写成 Favoriten 目录里的 .lnk（原版 ini
-            // [Favoriten] Ordner=.\Favoriten\ 布局；文案「添加到收藏夹...」
-            // 来自原版 UIA 一级菜单 dump，id 32919 来自模板 #216 字面文本
-            // "Zu Favoriten hinzufügen"——双语硬证据）。
-            if let Some(p) = selected.first() {
-                let name = p
-                    .file_name()
-                    .map(|s| s.to_string_lossy().into_owned())
-                    .unwrap_or_else(|| "收藏夹".to_string());
-                let fav_dir = resolve_relative(frame.config.favoriten_dir.clone());
-                let _ = std::fs::create_dir_all(&fav_dir);
-                let lnk = fav_dir.join(format!("{name}.lnk"));
-                match shell::create_shortcut(&lnk, p) {
-                    Ok(()) => println!("[qdir-rs] TEST 添加到收藏夹 {lnk:?}"),
-                    Err(e) => eprintln!("[qdir-rs] 添加到收藏夹失败：{e}"),
-                }
-            }
-            true
         }
         id if pane_button_id(id).is_some() => {
             // 窗格命令按钮排：作用域 = 按钮所在窗格（不是活动焦点窗格）。
@@ -387,43 +337,65 @@ pub unsafe fn dispatch(frame: &mut MainFrame, main: HWND, id: u32) -> bool {
             println!("[qdir-rs] TEST 命令按钮 窗格{} 序号{bi}", bp + 1);
             true
         }
-        id if view_mode_for_id(id).is_some() => {
-            // 视图模式（大/小图标、列表、详细信息）。
-            let mode = view_mode_for_id(id).unwrap();
-            frame.set_view_mode_all(mode);
-            println!("[qdir-rs] TEST 视图模式 id={id} view={mode}");
-            true
-        }
-        id if active_pane_for_id(id).is_some() => {
-            // 「活动窗口 #N」。
-            let p = active_pane_for_id(id).unwrap();
-            if frame.set_active_pane(p) {
-                println!("[qdir-rs] TEST 活动窗口 #{}", p + 1);
-                true
-            } else {
-                false
-            }
-        }
-        32864 => {
-            // &Linien anzeigen：切换网格线。
-            frame.toggle_grid_lines_all();
-            println!("[qdir-rs] TEST 网格线切换");
-            true
-        }
-        33938 => {
-            // Spaltenbreite an Text anpassen (mit Spaltenkopf)。
-            frame.autofit_columns_all(true);
-            println!("[qdir-rs] TEST 列宽自适应(含列头)");
-            true
-        }
-        33939 => {
-            // Spaltenbreite an Text anpassen（不含列头）。
-            frame.autofit_columns_all(false);
-            println!("[qdir-rs] TEST 列宽自适应");
-            true
-        }
         _ => false,
     }
+}
+
+/// 状态文件对话框（附录 A.1：原版用 GetOpen/SaveFileNameW 过滤 *.qdr）。
+/// `save=true` 存盘，false 打开；取消返回 None。
+fn run_state_dialog(main: HWND, save: bool) -> Option<std::path::PathBuf> {
+    let mut buf = [0u16; 260];
+    let desc: Vec<u16> = brand::STATE_FILTER_DESC
+        .encode_utf16().chain(std::iter::once(0)).collect();
+    // 过滤器：描述 *.qdr  全零结尾。
+    let mut filter = desc.clone();
+    filter.extend("*.qdr".encode_utf16().chain(std::iter::once(0)));
+    filter.push(0);
+    let mut ofn = OPENFILENAMEW::default();
+    ofn.lStructSize = core::mem::size_of::<OPENFILENAMEW>() as u32;
+    ofn.hwndOwner = main;
+    ofn.lpstrFilter = PCWSTR::from_raw(filter.as_ptr());
+    ofn.lpstrFile = PWSTR::from_raw(buf.as_mut_ptr());
+    ofn.nMaxFile = buf.len() as u32;
+    let defext: Vec<u16> = "qdr".encode_utf16().chain(std::iter::once(0)).collect();
+    ofn.lpstrDefExt = PCWSTR::from_raw(defext.as_ptr());
+    ofn.Flags = OFN_PATHMUSTEXIST | OFN_OVERWRITEPROMPT;
+    let ok = unsafe {
+        if save {
+            ofn.Flags |= windows::Win32::UI::Controls::Dialogs::OFN_FILEMUSTEXIST;
+            GetSaveFileNameW(&mut ofn)
+        } else {
+            ofn.Flags |= OFN_FILEMUSTEXIST;
+            GetOpenFileNameW(&mut ofn)
+        }
+    };
+    if ok.as_bool() {
+        let end = buf.iter().position(|&c| c == 0).unwrap_or(buf.len());
+        Some(std::path::PathBuf::from(String::from_utf16_lossy(&buf[..end])))
+    } else {
+        None
+    }
+}
+
+/// 把载入的会话应用到界面（原版 E101=FUN_0046cc14 语义：全窗格重灌）。
+fn apply_session(frame: &mut MainFrame, st: crate::core::SessionState) {
+    frame.session = st;
+    frame.splitters.from_permille_ten(&frame.session.splits_h);
+    unsafe {
+        for i in 0..4 {
+            frame.fill_pane(i);
+        }
+    }
+}
+
+/// 以自有 exe 重复一个窗口（附录 A.1 E100=自启动；实现为 spawn）。
+fn duplicate_window(state: &std::path::Path) -> crate::core::QResult<()> {
+    let exe = std::env::current_exe().map_err(|e| crate::core::QError::from_io(&e))?;
+    std::process::Command::new(exe)
+        .arg(state)
+        .spawn()
+        .map(|_| ())
+        .map_err(|e| crate::core::QError::from_io(&e))
 }
 
 /// 切换布局模式并强制重排（原版布局按钮行为：不隐藏会话数据，只重排）。
@@ -448,22 +420,7 @@ fn set_layout(frame: &mut MainFrame, main: HWND, mode: crate::ui_native::splitte
     true
 }
 
-/// 「新建文件夹」编号：数目录里已存在的 `新建文件夹*`，避免重名。
-fn next_folder_seq(dir: &std::path::Path) -> usize {
-    let mut n = 0;
-    if let Ok(rd) = std::fs::read_dir(dir) {
-        for entry in rd.flatten() {
-            if entry
-                .file_name()
-                .to_string_lossy()
-                .starts_with("新建文件夹")
-            {
-                n += 1;
-            }
-        }
-    }
-    n + 1
-}
+
 
 // ---------- UI 缩放 ----------
 
@@ -538,41 +495,6 @@ mod tests {
         }
     }
 
-    #[test]
-    fn 按钮id与既有命令常量无重叠() {
-        use super::{cmd, layout};
-        let consts = [
-            cmd::NEW_FOLDER, cmd::COPY, cmd::CUT, cmd::PASTE, cmd::DELETE, cmd::OPEN,
-            cmd::PROPERTIES, cmd::REFRESH, cmd::ABOUT, cmd::POWERSHELL,
-            layout::Z6, layout::V6, layout::UPF, layout::NEW, layout::VIEW,
-            layout::UPDATE, layout::GO, layout::VIEWTREE,
-        ];
-        for id in consts {
-            assert_eq!(pane_button_id(id), None, "与按钮段冲突：id={id}");
-        }
-    }
 
-    #[test]
-    fn 视图模式id映射() {
-        use super::view_mode_for_id;
-        // commctrl.h LV_VIEW_*：ICON=0 DETAILS=1 SMALLICON=2 LIST=3。
-        assert_eq!(view_mode_for_id(33931), Some(0));
-        assert_eq!(view_mode_for_id(33932), Some(2));
-        assert_eq!(view_mode_for_id(33933), Some(3));
-        assert_eq!(view_mode_for_id(33934), Some(1));
-        for id in [33930u32, 33935, 32864, 32833] {
-            assert_eq!(view_mode_for_id(id), None, "id={id}");
-        }
-    }
 
-    #[test]
-    fn 活动窗口id映射() {
-        use super::active_pane_for_id;
-        for (id, p) in [(32833u32, 0usize), (32834, 1), (32835, 2), (32836, 3)] {
-            assert_eq!(active_pane_for_id(id), Some(p), "id={id}");
-        }
-        for id in [32832u32, 32837, 57601, 0xA76C] {
-            assert_eq!(active_pane_for_id(id), None, "id={id}");
-        }
-    }
 }

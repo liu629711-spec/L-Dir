@@ -87,12 +87,33 @@ P1 必须（产品可用性），按行为表证据实现；P2 体验完整；P3
 
 ## 4. 开发计划（阶段制，每阶段全绿交付）
 
-- **P0 合规脱嵌 + 品牌**（先做，小步快跑，每步 build+test 绿）
-  1. `brand.rs` 常量（产品名/版本/文件名默认值）替换全部散落的 "Q-Dir"/"12.71" 字面
-  2. 自绘 8 个导航图标占位（纯色几何图）替换 PNG include_bytes
-  3. 移除 res.rs 菜单模板 128：改 CreateMenuW 自建树（文案自定、id 用内部常量）
-  4. dialog_template 测试改为「模板可解析」冒烟（不再断言原版字节进产物）
-  验收：二进制内 grep 不到原版资源标识；测试全绿。
+- **P0 合规脱嵌 + 品牌**（✅ 完成 2026-10-22，证据见下）
+  1. ✅ `brand.rs`：PRODUCT_NAME/VERSION(0.1.0)/自有类名（LDir.*）/自名配置文件
+     （L-Dir.ini / L.qdr）+ 原版文件读取回退（R2 导入特性）；标题、状态栏、
+     类名、main.rs、egui 路线全部接品牌常量。
+  2. ✅ toolbar.rs 重写：12 个原版 PNG include_bytes → 自绘 48x48 几何 glyph
+     （Pen 结构体；layout_prev/next、layout_menu、new_window、view、refresh、
+     go、tree_toggle），2 个单元测试。按钮顺序与命令 id 保留（布局体验层）。
+  3. ✅ `ui_native/menu.rs`：CreateMenuW 自绘菜单（文件/查看/活动窗口/收藏/
+     帮助；自有中文文案、助记符）；id 段 30000+（cmd_id 常量，含 2 个测试：
+     段冲突回归 + HMENU 冒烟）。app.rs 不再加载模板 128。
+  4. ✅ 关于框：show_about_brand（MessageBoxW，brand 文案）替代原版模板 100；
+     res.rs/dialogs.rs 整体删除（含 4 个原版模板测试）。
+  5. ✅ commands.rs 重写分发：cmd::（57600=新建文件夹等**推断错**的旧常量）
+     删除，按附录 A 行为表实现 FILE_OPEN/SAVE/DESKTOP/DUP + cmd/powershell/
+     FileRun/Exit + 视图模式/网格线/列宽/缩放/配色/活动窗格/收藏夹；
+     GetOpen/SaveFileNameW 状态对话框（修复过 lpstrDefExt 悬垂指针）；
+     窗格按钮段保留并标注 tooltip 直译*待复核*不变。
+  6. ✅ shell/system.rs 新增：spawn_terminal / shell_file_run /
+     shell_shutdown_windows（IShellDispatch，附录 A.2 确证）。
+  验收实测（2026-10-22）：
+  - 二进制审计：`ATL:` 计数 0；"Q-Dir" 仅剩 brand.rs/config.rs 的兼容文件名
+    与 ini 段名字面量（R2 预期）；PNG 头为 image crate 解码签名表非资源。
+  - 端到端冒烟（PostMessage 新 id）：30024→「TEST 视图模式 id=30024 view=1」、
+    30025→「网格线切换」、30060→「配色档位」、30080→「活动窗口 #1」、
+    30200→弹出 #32770「L-Dir」关于框、39999→「[l-dir] 未接命令」留痕。
+  - cargo build 无 error；lib 254 + 集成 11 全绿（删除 7 个 1:1 时代测试、
+    新增 4 个自绘测试；基线 257→254-4+5=254 账目吻合）。
 - **P1 核心功能对标**（§3 P1 清单，按表逐项，钩子端到端验证）
 - **P2 体验完整**（对话框自绘模板 + 行为开关）
 - **P3 长尾**（逐项决策）

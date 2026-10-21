@@ -109,7 +109,7 @@ impl Default for ExportOptions {
                 ExportColumn::Modified,
             ],
             utf8_bom: true,
-            title: "Q-Dir Listexport".to_string(),
+            title: format!("{} Listexport", crate::brand::PRODUCT_NAME),
         }
     }
 }

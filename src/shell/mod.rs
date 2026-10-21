@@ -26,6 +26,7 @@ mod enumerate;
 mod fileops;
 mod icons;
 mod special;
+mod system;
 mod tray;
 
 pub use clipboard::{
@@ -51,6 +52,7 @@ pub use fileops::{
     rename_path, send_by_mail, show_properties,
 };
 pub use icons::{IconCache, IconImage, IconSize, icon_image_for_path, stock_icon, system_icon_index_for_path};
+pub use system::{shell_file_run, shell_shutdown_windows, spawn_terminal};
 pub use special::{
     DriveInfo, DriveKind, ShellLocation, desktop_path, documents_path, drive_root, is_drive_root,
     is_libraries, is_this_pc, libraries_path, list_drives, network_path, parse_shell_path,

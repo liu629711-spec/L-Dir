@@ -1,8 +1,8 @@
-//! 主窗口：按原版 UIA 控件树 1:1 复刻的四窗格布局。
+//! 主窗口：四窗格布局（布局体验对标 Q-Dir；外观自主，见 PRODUCT_SPEC）。
 //!
-//! 结构基准（examples/control_tree.rs 对原版 Q-Dir 12.71 的 dump）：
+//! 结构基准（历史证据：examples/control_tree.rs 对原版的 dump）：
 //! - 全局：`ReBarWindow32`（2 个 ToolbarWindow32 + 菜单）+ 全局 `msctls_statusbar32`
-//!   （5 段：N 个对象 / 12.71 / 用户 (x64) / 驱动器名 / 空闲空间）
+//!   （5 段：N 个对象 / 版本 / 用户 (x64) / 驱动器名 / 空闲空间）
 //! - 每窗格：内容容器 + 分割器容器 + 窗格状态栏；地址栏 Edit、3 个工具栏、
 //!   对象计数、驱动器 ComboBox、命令按钮排、Tab 页签、SysListView32。
 //!
@@ -19,6 +19,7 @@ use windows::Win32::Storage::FileSystem::{
 use windows::Win32::UI::Controls::*;
 use windows::Win32::UI::WindowsAndMessaging::*;
 
+use crate::brand;
 use crate::core::{ColumnDef, Config, FileItem, PaneId, PaneState, SessionState, sort_items};
 use crate::shell::{EnumOptions, FileItemExt, IconCache, IconSize, list_directory_detailed};
 use crate::ui::pane::format_filetime;
@@ -27,8 +28,8 @@ use crate::ui_native::splitter::{SPLITTER_WIDTH, SplitterGroup};
 /// LVS_REPORT(0x0001) | LVS_SHOWSELALWAYS(0x0008)
 const LVS_REPORT_SHOWSEL: u32 = 0x0001 | 0x0008;
 
-/// 主窗口类名（与原版 1:1：ATL 窗口类）。
-pub const FRAME_CLASS_NAME: &str = "ATL:0000000000546C90";
+/// 主窗口类名（自有，见 PRODUCT_SPEC R1）。
+pub const FRAME_CLASS_NAME: &str = brand::WINDOW_CLASS;
 
 /// 子窗口命令 ID 段（0..999 给系统内部，窗格从 1000 起）。
 const ID_FIRST_PANE: i32 = 1000;
@@ -65,8 +66,8 @@ const CMD_BUTTONS: &[&str] = &[
 const COLUMN_TITLES: &[&str] = &["名称", "修改日期", "类型", "大小"];
 const COLUMN_WIDTHS: &[i32] = &[200, 150, 120, 90];
 
-/// 原版窗格容器类名（ATL 私有类，需在宿主进程内注册）。
-const PANE_CLASS: PCWSTR = w!("ATL:00000000004189CC");
+/// 窗格容器类名（自有；原 ATL 私有类名属原版资产，不再复用——R1）。
+const PANE_CLASS: PCWSTR = w!("LDir.Pane");
 
 /// 是否已注册窗格容器类（进程内一次）。
 static PANE_CLASS_REGISTERED: std::sync::OnceLock<()> = std::sync::OnceLock::new();
@@ -339,7 +340,7 @@ impl MainFrame {
                 )
             };
             set_status_text(sb, 0, &object_count_text(&frame));
-            set_status_text(sb, 1, "12.71");
+            set_status_text(sb, 1, brand::PRODUCT_VERSION);
             set_status_text(sb, 2, &format!("{} (x64)", std::env::var("USERNAME").unwrap_or_default()));
         }
 
@@ -476,20 +477,15 @@ impl MainFrame {
 
     unsafe fn on_command(hwnd: HWND, wp: WPARAM) -> LRESULT {
         let id = (wp.0 & 0xFFFF) as u32;
-        match id {
-            // 菜单 128：「关于」= 57664（语言键 60001）。
-            57664 => unsafe { show_about(hwnd) },
-            _ => {
-                // 其余命令走分发模块（复制/剪切/粘贴/删除/打开/属性/新建/刷新）。
-                if let Some(frame) = Self::frame_of(hwnd) {
-                    if !crate::ui_native::commands::dispatch(frame, hwnd, id) {
-                        // 未识别的 id 留痕；附带已实证的文案提示方便定位。
-                        let hint = crate::ui_native::commands::known_label(id)
-                            .map(|s| format!("（原文案：{s}）"))
-                            .unwrap_or_default();
-                        eprintln!("[qdir-rs] 未接命令 id={id}{hint}");
-                    }
-                }
+        // 全部菜单命令走分发模块（自绘 id 段 30000+，见 commands/menu）。
+        if let Some(frame) = Self::frame_of(hwnd) {
+            let menu = frame.menu;
+            if !crate::ui_native::commands::dispatch(frame, hwnd, id) {
+                // 未识别的 id 留痕；从活的菜单反查文案，方便定位。
+                let hint = crate::ui_native::menu::label_of(menu, id)
+                    .map(|s| format!("（菜单文案：{s}）"))
+                    .unwrap_or_default();
+                eprintln!("[l-dir] 未接命令 id={id}{hint}");
             }
         }
         LRESULT(0)
@@ -1198,7 +1194,7 @@ unsafe fn create_pane(frame: &mut MainFrame, parent: HWND, hinstance: HINSTANCE,
     let container = create_child(
         parent,
         hinstance,
-        w!("ATL:00000000004189CC"),
+        PANE_CLASS,
         w!(""),
         WS_VISIBLE | WS_CHILD | WS_CLIPSIBLINGS,
         base,
@@ -1211,7 +1207,7 @@ unsafe fn create_pane(frame: &mut MainFrame, parent: HWND, hinstance: HINSTANCE,
     let content = create_child(
         container,
         hinstance,
-        w!("ATL:00000000004189CC"),
+        PANE_CLASS,
         w!(""),
         WS_VISIBLE | WS_CHILD | WS_CLIPSIBLINGS,
         base + 50,
@@ -1224,7 +1220,7 @@ unsafe fn create_pane(frame: &mut MainFrame, parent: HWND, hinstance: HINSTANCE,
     let list_host = create_child(
         content,
         hinstance,
-        w!("ATL:00000000004189CC"),
+        PANE_CLASS,
         w!(""),
         WS_VISIBLE | WS_CHILD | WS_CLIPSIBLINGS,
         base + 51,
@@ -1793,10 +1789,28 @@ unsafe fn select_row_if_valid(list: HWND, row: i32) {
     };
 }
 
-/// 「关于」对话框（原版 RT_DIALOG 100，374x199 DLU，18 控件）。
-unsafe fn show_about(parent: HWND) {
-    use crate::ui_native::dialogs::dialog_box;
-    unsafe { dialog_box(parent, "100", None) };
+/// 「关于」对话框（自绘文案；PRODUCT_SPEC R1 后不再使用原版模板 100）。
+/// MessageBoxW 兜底；品牌文案的唯一来源是 `brand` 模块。
+pub unsafe fn show_about_brand(parent: HWND) {
+    let title: Vec<u16> = crate::brand::PRODUCT_NAME
+        .encode_utf16().chain(std::iter::once(0)).collect();
+    let text = format!(
+        "{} {}
+{}
+Rust + 原生 Win32",
+        crate::brand::PRODUCT_NAME,
+        crate::brand::PRODUCT_VERSION,
+        crate::brand::TAGLINE
+    );
+    let textw: Vec<u16> = text.encode_utf16().chain(std::iter::once(0)).collect();
+    unsafe {
+        MessageBoxW(
+            Some(parent),
+            windows::core::PCWSTR(textw.as_ptr()),
+            windows::core::PCWSTR(title.as_ptr()),
+            MB_OK | MB_ICONINFORMATION,
+        );
+    }
 }
 
 #[cfg(test)]

@@ -5,9 +5,8 @@
 
 pub mod app;
 pub mod commands;
-pub mod dialogs;
 pub mod mainframe;
-pub mod res;
+pub mod menu;
 pub mod splitter;
 pub mod subclass;
 pub mod toolbar;

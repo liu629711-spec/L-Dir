@@ -14,7 +14,6 @@ use windows::Win32::UI::WindowsAndMessaging::*;
 
 use crate::core::{Config, SessionState};
 use crate::ui_native::mainframe::{FRAME_CLASS_NAME, MainFrame, PendingFrame};
-use crate::ui_native::res;
 
 /// 与原版 WinMain 一致的 Common Controls 类集（0x6FF）：
 /// 列表视图/树/页签/热键/Animate/Rebar/日期等。
@@ -58,51 +57,29 @@ impl App {
                 hInstance: hinstance,
                 hCursor,
                 hIcon,
-                hbrBackground: Default::default(), // 背景由 Q-Dir Colors 刷子接管
+                hbrBackground: Default::default(), // 背景由列表自绘刷子接管
                 lpszClassName: PCWSTR::from_raw(class_name.as_ptr()),
                 ..Default::default()
             };
             RegisterClassW(&wc);
 
-            // 5. 主菜单（原版菜单模板 128）。
-            // 注：LoadMenuIndirectW 偶发返回 NULL 且 GetLastError==0（实测连续启停
-            // 进程时复现）。重试 5 次 + 间隔；重试时复制到可写内存再加载。
-            let menu = {
-                let tmpl_bytes: Vec<u8> = res::menu_template("128")
-                    .map(|b| b.to_vec())
-                    .ok_or("menu 128 模板缺失")?;
-                let mut last: Option<String> = None;
-                let mut got: Option<HMENU> = None;
-                for attempt in 0..5 {
-                    SetLastError(WIN32_ERROR(0));
-                    match load_menu_indirect(&tmpl_bytes) {
-                        Ok(m) if !m.is_invalid() => {
-                            got = Some(m);
-                            break;
-                        }
-                        _ => {}
-                    }
-                    let e = windows::core::Error::from_hresult(windows::core::HRESULT::from_win32(
-                        GetLastError().0,
-                    ));
-                    last = Some(format!("{e}"));
-                    std::thread::sleep(std::time::Duration::from_millis(50));
-                }
-                match got {
-                    Some(m) => Some(m),
-                    None => return Err(format!("menu 128 加载失败: {:?}", last).into()),
-                }
-            };
+            // 5. 主菜单（自绘文案与结构，见 ui_native::menu——PRODUCT_SPEC R1）。
+            let menu = Some(crate::ui_native::menu::build_main_menu()?);
 
-            // 6. 创建主窗口（初始尺寸 Q-Dir.ini WinRC=0;0;800;600）。
+            // 6. 创建主窗口（初始尺寸 ini WinRC=0;0;800;600）。
             //    config/session 经 lpCreateParams 传入：WM_CREATE 在 CreateWindowExW
             //    返回之前就触发，只有这样才能让 on_create 用真实配置建 frame。
             let (w, h) = (config.win_rc[2].max(200), config.win_rc[3].max(150));
             let mut pending = PendingFrame::new(config, session, hinstance);
+            // 窗口标题宽串（w! 仅字面量，品牌常量经静态缓冲转换）。
+            let title: Vec<u16> = crate::brand::PRODUCT_NAME
+                .encode_utf16()
+                .chain(std::iter::once(0))
+                .collect();
             let hwnd = CreateWindowExW(
-                WS_EX_ACCEPTFILES, // 原版 DragAcceptFiles 语义
+                WS_EX_ACCEPTFILES, // 拖放文件语义
                 PCWSTR(class_name.as_ptr()),
-                windows::core::w!("Q-Dir"),
+                PCWSTR(title.as_ptr()),
                 WINDOW_STYLE(WS_OVERLAPPEDWINDOW.0 | WS_CLIPSIBLINGS.0 | WS_CLIPCHILDREN.0),
                 CW_USEDEFAULT, CW_USEDEFAULT, w, h,
                 None,
@@ -142,21 +119,7 @@ impl App {
     }
 }
 
-/// 原版菜单模板字节 → HMENU。
-///
-/// 与对话框同一条原则：**原字节原样交给 Windows**。Delphi 的 NEWMENU 模板
-/// 本身就是标准 MENUTEMPLATE 的超集（弹出层多带 2 字节 id 字段），
-/// LoadMenuIndirectW 能直接接受，不需要重建。
-///
-/// 依据：`examples/menu_probe.rs` 实测——原字节加载成功返回 HMENU；
-/// 而"重建"版本会让 LoadMenuIndirectW 访问越界（STATUS_ACCESS_VIOLATION）。
-fn load_menu_indirect(bytes: &[u8]) -> std::result::Result<HMENU, windows::core::Error> {
-    unsafe { LoadMenuIndirectW(bytes.as_ptr() as *const core::ffi::c_void) }
-}
-
+/// 应用图标：暂用系统默认；自绘图标后续接入（R1：不使用原版图标资源）。
 fn load_app_icon(_hinstance: HINSTANCE) -> HICON {
-    unsafe {
-        // 原版图标组 128 的 .ico 转换后续补；先系统默认图标兜底。
-        LoadIconW(None, IDI_APPLICATION).unwrap_or_default()
-    }
+    unsafe { LoadIconW(None, IDI_APPLICATION).unwrap_or_default() }
 }
