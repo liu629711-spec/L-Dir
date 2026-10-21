@@ -30,7 +30,12 @@ fn main() -> std::process::ExitCode {
             return std::process::ExitCode::FAILURE;
         }
     };
-    let qdr_path = pick(brand::SESSION_FILE, brand::LEGACY_SESSION_FILE);
+    // 命令行第一参数若为 .qdr 路径（重复窗口/重新打开状态传入）优先加载之。
+    let arg_state = std::env::args()
+        .nth(1)
+        .filter(|a| !a.starts_with('-') && a.ends_with(".qdr"))
+        .map(PathBuf::from);
+    let qdr_path = arg_state.unwrap_or_else(|| pick(brand::SESSION_FILE, brand::LEGACY_SESSION_FILE));
     let session = match config::load_session(&qdr_path) {
         Ok(s) => s,
         Err(e) => {
