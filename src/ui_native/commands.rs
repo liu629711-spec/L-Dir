@@ -211,6 +211,11 @@ pub unsafe fn dispatch(frame: &mut MainFrame, main: HWND, id: u32) -> bool {
             println!("[qdir-rs] TEST 查找：聚焦窗格{}过滤框", pane_idx + 1);
             true
         }
+        cmd_id::FILE_RESTART | cmd_id::FILE_RESTART_ADMIN => {
+            let admin = id == cmd_id::FILE_RESTART_ADMIN;
+            restart_self(frame, main, admin);
+            true
+        }
         cmd_id::FILE_EXIT => {
             let _ = PostMessageW(Some(main), WM_CLOSE, WPARAM(0), LPARAM(0));
             true
@@ -583,6 +588,41 @@ fn apply_session(frame: &mut MainFrame, st: crate::core::SessionState) {
     unsafe {
         for i in 0..4 {
             frame.fill_pane(i);
+        }
+    }
+}
+
+/// 重新启动（附录 A.1 确证 0xBD77：存状态→退出的组合链；管理员=0xBD75
+/// runas 单步）。新实例加载当前 exe 同目录的状态文件（原版 start2.qdr 同位）。
+fn restart_self(frame: &mut MainFrame, main: HWND, as_admin: bool) {
+    let exe = match std::env::current_exe() {
+        Ok(e) => e,
+        Err(_) => return,
+    };
+    let state = exe
+        .parent()
+        .map(|d| d.join(brand::SESSION_FILE))
+        .unwrap_or_else(|| std::path::PathBuf::from(brand::SESSION_FILE));
+    let save = crate::config::save_session(&state, &frame.session);
+    println!(
+        "[qdir-rs] TEST 重新启动 admin={} 状态存 {:?} {}",
+        as_admin as u32,
+        state,
+        if save.is_ok() { "ok" } else { "失败(继续无状态重启)" }
+    );
+    let arg = state.to_string_lossy().to_string();
+    // runas 弹 UAC；取消则原地停留（原版同样不退出）。
+    let spawned = if as_admin {
+        shell::relaunch_as_admin(&exe, &arg).is_ok()
+    } else {
+        std::process::Command::new(&exe)
+            .arg(&arg)
+            .spawn()
+            .is_ok()
+    };
+    if spawned {
+        unsafe {
+            let _ = PostMessageW(Some(main), WM_CLOSE, WPARAM(0), LPARAM(0));
         }
     }
 }

@@ -154,6 +154,19 @@ P1 必须（产品可用性），按行为表证据实现；P2 体验完整；P3
   Filter2 命中行的前景色优先级不变（custom-draw 按预算色写回）。
   实测：LVM_GETBKCOLOR 四档读回 001b1414/00fff314/00999999/00081800
   （BGR 序与 RGB 设计值一致），复位后控件回系统默认。单测 1 个。
+- ✅ 重新启动/以管理员重新启动（2026-10-22）：文件菜单「重新启动(&T)」
+  (30012)、「以管理员身份重新启动(&G)」(30013)，语义按附录 A.1
+  （原 0xBD77=存状态→退出；0xBD75=ShellExecuteExW verb="runas"）。
+  `restart_self`：save_session 到 exe 旁 L.qdr →
+  普通重启 `std::process::Command` 带状态文件参数 / 管理重启
+  `shell::relaunch_as_admin`（SEE_MASK_NOCLOSEPROCESS，hProcess=null
+  =UAC 取消→原版同款「留在当前实例不退出」）→ 成功才 PostMessage
+  WM_CLOSE 自关。新实例走既有 arg_state 路径加载 L.qdr（main.rs 现成）。
+  实测：PostMessage WM_COMMAND(30012) → log「TEST 重新启动 admin=0
+  状态存 …\release\L.qdr ok」、L.qdr 836 字节生成、旧 PID 窗口消失、
+  新 PID 窗口标题 L-Dir 存活（1→1 替换确证）。附带修复：SP0/SP1/SP2
+  回写循环 set_in_place→set（与预览项同类缺陷：新 .qdr 缺键时静默丢
+  分割位置；等值保留 5003 的 continue 分支不变）。
 
 - 高亮/过滤规则编辑对话框（自绘模板）、
 标签行为开关（双击关/中键关/提示气泡——分支确证）、打印、查找、

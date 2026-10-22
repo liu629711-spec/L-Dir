@@ -1222,7 +1222,7 @@ pub fn apply_session_to_doc(doc: &mut IniDocument, st: &SessionState) {
         if old_val == Some(want) {
             continue; // 原文换算后一致，保留原值（如 5003）
         }
-        doc.set_in_place("", key, want.to_qdr_ten_thousandths().to_string());
+        doc.set("", key, want.to_qdr_ten_thousandths().to_string());
     }
     doc.set("", QDR_KEYS::SPT, st.split_preview.to_qdr_ten_thousandths().to_string());
     doc.set("", QDR_KEYS::TREE_MODE, st.tree_mode.to_u32().to_string());
