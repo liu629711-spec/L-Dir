@@ -13,6 +13,7 @@ use windows::core::{PCWSTR, w};
 use windows::Win32::Foundation::*;
 use windows::Win32::Graphics::Gdi::*;
 use windows::Win32::UI::Input::KeyboardAndMouse::SetFocus;
+use windows::Win32::System::SystemServices::{SS_BITMAP, SS_NOTIFY};
 use windows::Win32::Storage::FileSystem::{
     FILE_ATTRIBUTE_DIRECTORY, GetDiskFreeSpaceExW, GetDriveTypeW, GetLogicalDriveStringsW,
     GetVolumeInformationW,
@@ -48,6 +49,9 @@ const CID_COMBO_DRIVES: i32 = 7;
 const CID_STATUS: i32 = 8;
 /// 窗格目录树（SysTreeView32）。
 const CID_TREE: i32 = 9;
+/// 预览面板：图片 static / 文本 Edit。
+const CID_PREVIEW_IMG: i32 = 10;
+const CID_PREVIEW_TEXT: i32 = 11;
 
 // ---- 全局子控件 ID ----
 const CID_REBAR: i32 = 90;
@@ -228,6 +232,11 @@ struct PaneWindows {
     tab: Option<HWND>,
     status: Option<HWND>,
     list: Option<HWND>,
+    /// 预览面板（Vorschau）：图片 static（SS_BITMAP）+ 文本只读 Edit。
+    preview_img: Option<HWND>,
+    preview_text: Option<HWND>,
+    /// 当前挂在 preview_img 上的位图（换图时 DeleteObject）。
+    preview_bmp: Option<isize>,
     /// 窗格目录树（SysTreeView32，tree_mode 非 0 时可见；附录 A.3）。
     tree: Option<HWND>,
     /// 树节点登记（HTREEITEM→路径）+ 回环抑制标志（busy）。
@@ -265,6 +274,8 @@ pub struct MainFrame {
     panes_filled: [bool; 4],
     /// 窗格过滤框文本（EN_CHANGE 更新；fill_pane 应用为快速筛名）。
     pane_filter: [String; 4],
+    /// 预览面板每窗格内容类型：0=文本 1=图片 2=隐藏（布局 pass 消费）。
+    preview_mode: [u8; 4],
     /// 系统小图标 ImageList 里的文件夹图标索引（首建树时解析一次）。
     folder_image: i32,
 }
@@ -284,6 +295,7 @@ impl MainFrame {
             ui_scale: 100,
             panes_filled: [false; 4],
             pane_filter: Default::default(),
+            preview_mode: [2; 4],
             folder_image: -1,
         }
     }
@@ -425,6 +437,60 @@ impl MainFrame {
 
         // 4. 按会话恢复分割条比例（千分比 → 内部万分比）。
         frame.splitters.from_permille_ten(&frame.session.splits_h);
+
+        // 验证钩子：QDIR_TEST_PREVIEW=1 → 开预览并选中窗格1第一个可预览
+        // 文件（=img 优先图片分支；QDIR_TEST_PREVIEW_DIR 覆盖窗格1目录）。
+        if std::env::var("QDIR_TEST_PREVIEW").is_ok() {
+            if let Ok(dir) = std::env::var("QDIR_TEST_PREVIEW_DIR") {
+                let p = std::path::PathBuf::from(dir);
+                if p.is_dir() {
+                    let ts = frame.session.panes[0].tabs_pos;
+                    let tab = &mut frame.session.panes[0].tabs[ts];
+                    tab.path = p.clone();
+                    tab.history.clear();
+                    tab.history.push(p);
+                    tab.history_pos = 0;
+                    frame.fill_pane(0);
+                }
+            }
+            let want_img = std::env::var("QDIR_TEST_PREVIEW")
+                .map(|v| v == "img")
+                .unwrap_or(false);
+            let _ = frame.toggle_preview(hwnd);
+            let is_img = |p: &std::path::Path| {
+                p.extension()
+                    .and_then(|e| e.to_str())
+                    .map(|e| {
+                        matches!(
+                            e.to_ascii_lowercase().as_str(),
+                            "png" | "jpg" | "jpeg" | "gif" | "bmp" | "ico" | "webp"
+                        )
+                    })
+                    .unwrap_or(false)
+            };
+            let pick = frame.panes[0]
+                .row_paths
+                .iter()
+                .position(|p| {
+                    p.is_file()
+                        && crate::panes::preview::previewable(p, &frame.config.preview_filter)
+                        && (!want_img || is_img(p))
+                });
+            match pick {
+                Some(r) => {
+                    if let Some(list) = frame.panes[0].list {
+                        unsafe { select_row_if_valid(list, r as i32) };
+                        frame.update_preview_pane(0);
+                        let mode = frame.preview_mode[0];
+                        println!(
+                            "[qdir-rs] TEST 预览钩子 选中行 {r} mode={} {:?}",
+                            mode, frame.panes[0].row_paths[r]
+                        );
+                    }
+                }
+                None => println!("[qdir-rs] TEST 预览钩子：窗格1 无可预览文件"),
+            }
+        }
 
         LRESULT(0)
     }
@@ -867,6 +933,172 @@ impl MainFrame {
         }
     }
 
+    /// 刷新窗格预览面板：按当前选中项构建 PreviewData 并落到
+    /// 文本 Edit / 图片 Static（SS_BITMAP）。无选中/目录/Filter 未命中=隐藏。
+    pub fn update_preview_pane(&mut self, index: usize) {
+        if !self.session.preview_visible {
+            self.preview_mode[index] = 2;
+            return;
+        }
+        let sel = self.selected_paths(index);
+        let filter = self.config.preview_filter.clone();
+        let data = match sel.first() {
+            Some(path) if path.is_file() => {
+                if !crate::panes::preview::previewable(path, &filter) {
+                    None
+                } else {
+                    crate::panes::preview::build_preview(path, &filter, None).ok()
+                }
+            }
+            _ => None,
+        };
+        let Some(data) = data else {
+            self.preview_mode[index] = 2;
+            self.preview_sync_visibility(index);
+            return;
+        };
+        match data {
+            crate::panes::preview::PreviewData::Text(tx) => {
+                let mut body = tx.lines.join("\r\n");
+                if tx.truncated {
+                    body.push_str(&format!("\r\n… 截断（共 {} 字节）", tx.total_bytes));
+                }
+                self.preview_set_text(index, &body);
+                self.preview_mode[index] = 0;
+            }
+            crate::panes::preview::PreviewData::Binary(b) => {
+                let hex: String = b.head.iter().take(64).map(|x| format!("{x:02X} ")).collect();
+                self.preview_set_text(
+                    index,
+                    &format!("二进制 {} 字节\r\n前导: {hex}", b.total_bytes),
+                );
+                self.preview_mode[index] = 0;
+            }
+            crate::panes::preview::PreviewData::Image(img) => {
+                if unsafe { self.preview_set_bitmap(index, &img) } {
+                    self.preview_mode[index] = 1;
+                } else {
+                    self.preview_mode[index] = 2;
+                }
+            }
+        }
+        self.preview_sync_visibility(index);
+    }
+
+    /// 按 preview_mode 直接切两控件显隐（几何不变时；开/关重排走 toggle）。
+    pub fn preview_sync_visibility(&mut self, index: usize) {
+        let mode = self.preview_mode[index];
+        unsafe {
+            if let Some(img) = self.panes[index].preview_img {
+                let _ = ShowWindow(
+                    img,
+                    if mode == 1 && self.session.preview_visible {
+                        SW_SHOWNA
+                    } else {
+                        SW_HIDE
+                    },
+                );
+            }
+            if let Some(txt) = self.panes[index].preview_text {
+                let _ = ShowWindow(
+                    txt,
+                    if mode == 0 && self.session.preview_visible {
+                        SW_SHOWNA
+                    } else {
+                        SW_HIDE
+                    },
+                );
+            }
+        }
+    }
+
+    /// Vorschau 开关：写会话、刷新/隐藏并重排（列表要腾出预览列）。
+    pub unsafe fn toggle_preview(&mut self, main: HWND) -> bool {
+        let on = !self.session.preview_visible;
+        self.session.preview_visible = on;
+        if on {
+            let idx = (self.session.focus.number() - 1) as usize;
+            self.update_preview_pane(idx);
+        } else {
+            for i in 0..4 {
+                self.preview_mode[i] = 2;
+            }
+        }
+        let _ = SetWindowPos(
+            main,
+            None,
+            0,
+            0,
+            0,
+            0,
+            SET_WINDOW_POS_FLAGS(
+                SWP_NOMOVE.0 | SWP_NOSIZE.0 | SWP_NOZORDER.0 | SWP_FRAMECHANGED.0,
+            ),
+        );
+        let _ = SendMessageW(main, WM_SIZE, Some(WPARAM(SIZE_RESTORED as usize)), None);
+        on
+    }
+
+    fn preview_set_text(&mut self, index: usize, text: &str) {
+        let Some(e) = self.panes[index].preview_text else { return };
+        let wide: Vec<u16> = text.encode_utf16().chain(std::iter::once(0)).collect();
+        let _ = unsafe { SetWindowTextW(e, windows::core::PCWSTR::from_raw(wide.as_ptr())) };
+    }
+
+    /// RGBA8 → 32bpp DIB（BGRA、alpha 合成白底）并 STM_SETIMAGE；旧图删除。
+    unsafe fn preview_set_bitmap(
+        &mut self,
+        index: usize,
+        img: &crate::panes::preview::ImagePreview,
+    ) -> bool {
+        let Some(st) = self.panes[index].preview_img else {
+            return false;
+        };
+        let (w, h) = (img.width.max(1) as i32, img.height.max(1) as i32);
+        let mut bmi = BITMAPINFO::default();
+        bmi.bmiHeader = BITMAPINFOHEADER {
+            biSize: core::mem::size_of::<BITMAPINFOHEADER>() as u32,
+            biWidth: w,
+            biHeight: -h,
+            biPlanes: 1,
+            biBitCount: 32,
+            biCompression: BI_RGB.0 as u32,
+            ..Default::default()
+        };
+        let mut ptr: *mut core::ffi::c_void = core::ptr::null_mut();
+        let Ok(hbm) = CreateDIBSection(None, &bmi, DIB_RGB_COLORS, &mut ptr, None, 0) else {
+            return false;
+        };
+        if ptr.is_null() {
+            let _ = DeleteObject(HGDIOBJ(hbm.0));
+            return false;
+        }
+        let dst = core::slice::from_raw_parts_mut(ptr as *mut u8, (w * h * 4) as usize);
+        dst.fill(0xFF);
+        let n = (w as usize * h as usize).min(img.rgba.len() / 4);
+        for i in 0..n {
+            let s = &img.rgba[i * 4..i * 4 + 4];
+            let a = s[3] as u32;
+            let d = i * 4;
+            dst[d] = ((s[2] as u32 * a + 255 * (255 - a)) / 255) as u8; // B
+            dst[d + 1] = ((s[1] as u32 * a + 255 * (255 - a)) / 255) as u8; // G
+            dst[d + 2] = ((s[0] as u32 * a + 255 * (255 - a)) / 255) as u8; // R
+            dst[d + 3] = 255;
+        }
+        let old = SendMessageW(
+            st,
+            STM_SETIMAGE,
+            Some(WPARAM(IMAGE_BITMAP.0 as usize)),
+            Some(LPARAM(hbm.0 as isize)),
+        );
+        if old.0 != 0 {
+            let _ = DeleteObject(HGDIOBJ(old.0 as *mut core::ffi::c_void));
+        }
+        self.panes[index].preview_bmp = Some(hbm.0 as isize);
+        let _ = RedrawWindow(Some(st), None, None, RDW_INVALIDATE | RDW_UPDATENOW);
+        true
+    }
+
     /// 重灌某个窗格（枚举 + 填充列表）。
     pub(crate) unsafe fn fill_pane(&mut self, index: usize) {
         let Some(hwnd) = self.panes[index].list else {
@@ -971,6 +1203,8 @@ impl MainFrame {
                 }
                 self.panes_filled[index] = true;
                 unsafe { self.paint_sort_glyphs(index) };
+                // 重灌后刷新预览（选中集已变；空选择自动隐藏）。
+                self.update_preview_pane(index);
                 // 验证钩子：QDIR_TEST_SELECT_ROW 设置时选中该行（外部命令测试用，同进程安全）。
                 if let Ok(s) = std::env::var("QDIR_TEST_SELECT_ROW") {
                     if let Ok(row) = s.trim().parse::<i32>() {
@@ -1125,6 +1359,12 @@ impl MainFrame {
                         self.session.focus = id;
                     }
                 }
+                self.update_preview_pane(pidx);
+                LRESULT(0)
+            }
+            c if c == LVN_ITEMCHANGED && role == Src::List => {
+                // 选中变化（键盘/程序选择也走这里）：预览跟随。
+                self.update_preview_pane(pidx);
                 LRESULT(0)
             }
             c if c == TCN_SELCHANGE && role == Src::Tab => {
@@ -1701,6 +1941,29 @@ unsafe fn create_pane(frame: &mut MainFrame, parent: HWND, hinstance: HINSTANCE,
         base + CID_LIST,
     )
     .ok();
+    // 预览面板控件（默认隐藏；session.preview_visible 时由布局 pass 显示）。
+    frame.panes[index].preview_img = create_child(
+        content,
+        hinstance,
+        w!("Static"),
+        w!(""),
+        WS_CHILD | WS_CLIPSIBLINGS | WINDOW_STYLE(SS_BITMAP.0 | SS_NOTIFY.0),
+        base + CID_PREVIEW_IMG,
+    )
+    .ok();
+    frame.panes[index].preview_text = create_child(
+        content,
+        hinstance,
+        w!("Edit"),
+        w!(""),
+        WS_CHILD
+            | WS_CLIPSIBLINGS
+            | WS_BORDER
+            | WINDOW_STYLE((ES_MULTILINE | ES_READONLY) as u32 | WS_VSCROLL.0),
+        base + CID_PREVIEW_TEXT,
+    )
+    .ok();
+
     // 窗格目录树（tree_mode 非 0 时由 layout_pane_children 定位显示）。
     frame.panes[index].tree = create_child(
         content,
@@ -2094,7 +2357,18 @@ fn layout_pane_children(frame: &mut MainFrame, index: usize, r: (i32, i32, i32, 
     let mode = frame.session.tree_mode.to_u32();
     let geom = tree::tree_layout_for(mode);
     // body 矩形用 content 客户坐标（相对 content）。
-    let body = (cx0, ccy0 + body_y, cw, body_h);
+    let full_body = (cx0, ccy0 + body_y, cw, body_h);
+    // 预览面板（Vorschau）：右侧列，宽=(1-preview_pos) 比例钳 15%..50%。
+    let (body, preview_rect) = if frame.session.preview_visible {
+        let ratio = (1.0 - frame.session.preview_pos.ratio()).clamp(0.15, 0.5);
+        let pw = (cw as f32 * ratio) as i32;
+        (
+            (full_body.0, full_body.1, (cw - pw - tree::TREE_GAP).max(60), full_body.3),
+            Some((full_body.0 + cw - pw, full_body.1, pw, full_body.3)),
+        )
+    } else {
+        (full_body, None)
+    };
     let (tree_rect, list_rect) = match geom {
         None => (None, body),
         Some(false) => {
@@ -2140,6 +2414,22 @@ fn layout_pane_children(frame: &mut MainFrame, index: usize, r: (i32, i32, i32, 
             }
         }
     }
+    // 预览面板显隐与几何：图片/文本二选一（preview_mode 决定）。
+    match (preview_rect, p.preview_img, p.preview_text) {
+        (Some((px, py, pw, ph)), Some(img), Some(txt)) => unsafe {
+            let _ = SetWindowPos(img, None, px, py, pw.max(1), ph.max(1), swp);
+            let _ = SetWindowPos(txt, None, px, py, pw.max(1), ph.max(1), swp);
+            let mode = frame.preview_mode[index];
+            let _ = ShowWindow(img, if mode == 1 { SW_SHOWNA } else { SW_HIDE });
+            let _ = ShowWindow(txt, if mode == 0 { SW_SHOWNA } else { SW_HIDE });
+        },
+        (None, Some(img), Some(txt)) => unsafe {
+            let _ = ShowWindow(img, SW_HIDE);
+            let _ = ShowWindow(txt, SW_HIDE);
+        },
+        _ => {}
+    }
+
     // 窗格状态栏（container 子窗）。
     put(p.status, 0, h - status_h, w, status_h);
 }

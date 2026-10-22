@@ -302,8 +302,15 @@ pub unsafe fn dispatch(frame: &mut MainFrame, main: HWND, id: u32) -> bool {
             true
         }
         layout::VIEW => {
-            // 原版转发给窗格内容窗 0xd1f；当前内容窗无该私有消息处理，留痕。
-            println!("[qdir-rs] TEST 工具栏 view（0xd1f 语义待内容窗实现）");
+            // view 按钮 = 预览面板开/关（原版 0xd1f 私有消息语义按 Vorschau
+            // 开关解释，附录 A.4 字面留档；开关写会话，存 .qdr 生效）。
+            let on = frame.toggle_preview(main);
+            println!("[qdir-rs] TEST 预览面板 Vorschau={}", on as u32);
+            true
+        }
+        cmd_id::VIEW_PREVIEW_TOGGLE => {
+            let on = frame.toggle_preview(main);
+            println!("[qdir-rs] TEST 预览面板 Vorschau={}", on as u32);
             true
         }
         layout::VIEWTREE => {

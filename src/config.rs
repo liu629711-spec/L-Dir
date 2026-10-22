@@ -1205,8 +1205,8 @@ pub fn load_session_bytes(bytes: &[u8]) -> QResult<SessionState> {
 ///
 /// 未建模的顶层键（`windowplacement`、未知未来键）由 doc 原样保留。
 pub fn apply_session_to_doc(doc: &mut IniDocument, st: &SessionState) {
-    doc.set_in_place("", QDR_KEYS::VERSION, st.version.clone());
-    doc.set_in_place("", QDR_KEYS::VIEW_MODE, st.view_mode.to_string());
+    doc.set("", QDR_KEYS::VERSION, st.version.clone());
+    doc.set("", QDR_KEYS::VIEW_MODE, st.view_mode.to_string());
     // 万分数精度：SplitPermille 只存千分比（契约类型，不可改），
     // 因此 5003 -> 500 -> 5000 会有 3/10000 的取整损失。
     // E2 要求「除本次修改的键外逐字节等价」，故：
@@ -1224,12 +1224,12 @@ pub fn apply_session_to_doc(doc: &mut IniDocument, st: &SessionState) {
         }
         doc.set_in_place("", key, want.to_qdr_ten_thousandths().to_string());
     }
-    doc.set_in_place("", QDR_KEYS::SPT, st.split_preview.to_qdr_ten_thousandths().to_string());
-    doc.set_in_place("", QDR_KEYS::TREE_MODE, st.tree_mode.to_u32().to_string());
-    doc.set_in_place("", QDR_KEYS::VORSCHAU, bool_u8(st.preview_visible).to_string());
-    doc.set_in_place("", QDR_KEYS::VORSCHAU_POS, st.preview_pos.to_qdr_ten_thousandths().to_string());
-    doc.set_in_place("", QDR_KEYS::FOCUS, st.focus.number().to_string());
-    doc.set_in_place("", QDR_KEYS::COLORTHEMA, st.colorthema.to_string());
+    doc.set("", QDR_KEYS::SPT, st.split_preview.to_qdr_ten_thousandths().to_string());
+    doc.set("", QDR_KEYS::TREE_MODE, st.tree_mode.to_u32().to_string());
+    doc.set("", QDR_KEYS::VORSCHAU, bool_u8(st.preview_visible).to_string());
+    doc.set("", QDR_KEYS::VORSCHAU_POS, st.preview_pos.to_qdr_ten_thousandths().to_string());
+    doc.set("", QDR_KEYS::FOCUS, st.focus.number().to_string());
+    doc.set("", QDR_KEYS::COLORTHEMA, st.colorthema.to_string());
 
     for pane_id in PaneId::ALL {
         let n = pane_id.number();
@@ -1514,6 +1514,23 @@ mod tests {
         assert_eq!(st.focus, PaneId::P1);
         assert_eq!(st.pane(PaneId::P1).tree_split, 250);
         assert_eq!(st.tree_mode, TreeMode::Off);
+    }
+
+    #[test]
+    fn qdr_vorschau_roundtrip() {
+        // 预览开关 Vorschau=1 与位置 VorschauPos 往返（save 走文件，load 走字节）。
+        let mut st = SessionState::default();
+        st.preview_visible = true;
+        st.preview_pos = SplitPermille(300);
+        let dir = std::env::temp_dir().join("qdir-rs-vorschau-test");
+        std::fs::create_dir_all(&dir).expect("tmp dir");
+        let path = dir.join("pv.qdr");
+        save_session(&path, &st).expect("存");
+        let bytes = std::fs::read(&path).expect("读");
+        let back = load_session_bytes(&bytes).expect("载");
+        let _ = std::fs::remove_dir_all(&dir);
+        assert!(back.preview_visible, "Vorschau=1 往返");
+        assert_eq!(back.preview_pos.value(), 300);
     }
 
     #[test]

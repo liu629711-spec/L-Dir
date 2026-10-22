@@ -123,6 +123,19 @@ P1 必须（产品可用性），按行为表证据实现；P2 体验完整；P3
   与消息泵加速键表 F3（CreateAcceleratorTableW+TranslateAcceleratorW）=
   聚焦活动窗格过滤框，键入即接上面的快速过滤。实测：F3 后 GetGUIThreadInfo
   焦点句柄=窗格1 过滤 Edit（id 1003）。
+- ✅ 预览面板 Vorschau 接原生 UI（2026-10-22）：每窗格 content 内
+  Static(SS_BITMAP)+只读多行 Edit 双控件；`toggle_preview` 写会话+重排
+  （列表让出右侧列，宽=(1-preview_pos) 钳 15%..50%）；NM_CLICK/
+  LVN_ITEMCHANGED/fill_pane 三路刷新 `update_preview_pane`，数据走
+  panes::preview（Image→CreateDIBSection BGRA 合成白底→STM_SETIMAGE，
+  Text/Binary→Edit 文本）；view 按钮(0xA775 原版 0xd1f)按 Vorschau
+  开关解释（附录 A.4 字面留档*待复核*）；查看菜单「预览面板(&P)」
+  30034。QDIR_TEST_PREVIEW[=img|_DIR=覆盖目录] 钩子实测：文本分支
+  mode=0（.bash_history 前导 hex）、图片分支 mode=1（ThemeA img20.jpg，
+  Static 显 Edit 隐）、列表宽 390→289 挤压正确、30034 开→关→开控件
+  显隐正确。附带修复：`apply_session_to_doc` 的 8 个顶层键
+  set_in_place→set——原语义在**新建 .qdr** 时静默丢键（Vorschau 往返
+  单测暴露；旧文件原位替换语义不变）。Vorschau/VorschauPos 往返单测。
 - ✅ 标签行为开关（2026-10-22）：`core::tab_click_action` 纯函数决策
   （TabConfig.close_by_mbt_clk / close_by_lbt_dblclk，原版配置键分支确证；
   单测）。子类化扩展第三角色 ROLE_TAB（refdata 编码改 `pane<<2|role`）：
