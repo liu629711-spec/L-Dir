@@ -320,6 +320,17 @@ impl Default for SortDir {
 /// 按排序键对条目排序（契约未规定，实现者补充；任务要求「FileItem 按 SortKey 排序」）。
 ///
 /// 目录恒排在文件之前（资源管理器惯例），且不受排序方向影响；
+/// 快速过滤（窗格过滤框）：按小写「包含」保留名字命中的条目。
+/// 空串 = 不过滤（原地恢复全量由调用方重灌实现）。语义按 Explorer 搜索框
+/// 惯例自定；*原版 EN_CHANGE 处理器未反编译确证，待复核*。
+pub fn filter_by_query(items: &mut Vec<FileItem>, query: &str) {
+    let q = query.trim().to_lowercase();
+    if q.is_empty() {
+        return;
+    }
+    items.retain(|it| it.name.to_lowercase().contains(&q));
+}
+
 /// 方向只作用于键值本身的升降序。
 pub fn sort_items(items: &mut [FileItem], key: SortKey, dir: SortDir) {
     items.sort_by(|a, b| {
@@ -1738,6 +1749,22 @@ mod tests {
         assert_eq!(ExportFormat::Html.ext(), "html");
         assert_eq!(ExportFormat::Xls.ext(), "xls");
         assert_eq!(ExportFormat::TabSeparatedIni.ext(), "ini");
+    }
+
+    #[test]
+    fn filter_by_query_contains_case_insensitive() {
+        let mut items = vec![
+            FileItem { path: PathBuf::from(r"C:\Report.txt"), name: "Report.txt".into(), is_dir: false, is_hidden: false, size: 1, modified: 0, icon_index: None },
+            FileItem { path: PathBuf::from(r"C:
+otes"), name: "notes".into(), is_dir: true, is_hidden: false, size: 0, modified: 0, icon_index: None },
+        ];
+        filter_by_query(&mut items, "REP");
+        assert_eq!(items.len(), 1, "大小写无关包含");
+        assert_eq!(items[0].name, "Report.txt");
+        filter_by_query(&mut items, "");
+        assert_eq!(items.len(), 1, "空串不过滤（已筛掉的需调用方重灌）");
+        filter_by_query(&mut items, "   ");
+        assert_eq!(items.len(), 1, "纯空白=不过滤");
     }
 
     #[test]

@@ -495,6 +495,19 @@ pub fn write_export(
     fs::write(path, &bytes).map_err(|e| QError::from_io(&e))
 }
 
+/// 按文件扩展名选导出格式（原版导出对话框默认 `.txt`；四档 filter）。
+/// 未知扩展回落 None → 调用方决定（对话框带 defext 时一般不会走到）。
+pub fn format_from_ext(ext: &str) -> Option<crate::core::ExportFormat> {
+    use crate::core::ExportFormat as F;
+    match ext.trim_start_matches('.').to_ascii_lowercase().as_str() {
+        "txt" => Some(F::Txt),
+        "csv" => Some(F::Csv),
+        "htm" | "html" => Some(F::Html),
+        "xls" => Some(F::Xls),
+        _ => None,
+    }
+}
+
 /// 便捷入口：导出到内存字节（含 BOM 决策），供剪贴板/拖放复用。
 pub fn export_bytes(
     items: &[FileItem],
@@ -545,6 +558,18 @@ mod tests {
             utf8_bom: true,
             title: "T".to_string(),
         }
+    }
+
+    #[test]
+    fn format_from_ext_mapping() {
+        use crate::core::ExportFormat as F;
+        assert_eq!(format_from_ext("txt"), Some(F::Txt));
+        assert_eq!(format_from_ext(".TXT"), Some(F::Txt));
+        assert_eq!(format_from_ext("csv"), Some(F::Csv));
+        assert_eq!(format_from_ext("html"), Some(F::Html));
+        assert_eq!(format_from_ext("htm"), Some(F::Html));
+        assert_eq!(format_from_ext("xls"), Some(F::Xls));
+        assert_eq!(format_from_ext("pdf"), None);
     }
 
     #[test]

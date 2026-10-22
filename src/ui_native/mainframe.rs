@@ -71,6 +71,9 @@ const CMD_BUTTONS: &[&str] = &[
 const COLUMN_TITLES: &[&str] = &["名称", "修改日期", "类型", "大小"];
 const COLUMN_WIDTHS: &[i32] = &[200, 150, 120, 90];
 
+/// 过滤框读写探针只跑一次。
+static FILTER_PROBE_ONCE: std::sync::atomic::AtomicBool = std::sync::atomic::AtomicBool::new(false);
+
 /// 树交互探针只跑一次。
 static TREE_PROBE_DONE: std::sync::atomic::AtomicBool = std::sync::atomic::AtomicBool::new(false);
 
@@ -95,10 +98,18 @@ unsafe fn ensure_pane_class(hinstance: HINSTANCE) {
             }
         }
         if msg == WM_COMMAND {
-            // 只上送命令按钮排的 BN_CLICKED（id=base+20..29）：按钮是
-            // content 子窗，不转发则默认 DefWindowProc 吞掉点击。
-            // Edit 的 EN_*（addr id=base+1 等）维持原样不上送，避免噪声。
+            // 上送命令按钮排的 BN_CLICKED（id=base+20..29）与过滤框 EN_CHANGE
+            // （id%100==3, 通知码 768）：不转发则默认 DefWindowProc 吞掉。
+            // addr Edit 的其余 EN_* 维持不上送，避免噪声。
             let id = (wp.0 & 0xFFFF) as u32;
+            let notify = ((wp.0 >> 16) & 0xFFFF) as u32;
+            if (1000..1400).contains(&id) && (id - 1000) % 100 == CID_FILTER_EDIT as u32 && notify == EN_CHANGE {
+                if let Ok(parent) = unsafe { GetParent(hwnd) } {
+                    if !parent.is_invalid() {
+                        return unsafe { SendMessageW(parent, msg, Some(wp), Some(lp)) };
+                    }
+                }
+            }
             if crate::ui_native::commands::pane_button_id(id).is_some() {
                 if let Ok(parent) = unsafe { GetParent(hwnd) } {
                     if !parent.is_invalid() {
@@ -252,6 +263,8 @@ pub struct MainFrame {
     pub ui_scale: u32,
     /// 窗格是否已灌过数据（避免重复枚举）。
     panes_filled: [bool; 4],
+    /// 窗格过滤框文本（EN_CHANGE 更新；fill_pane 应用为快速筛名）。
+    pane_filter: [String; 4],
     /// 系统小图标 ImageList 里的文件夹图标索引（首建树时解析一次）。
     folder_image: i32,
 }
@@ -270,6 +283,7 @@ impl MainFrame {
             ui_font: HFONT::default(),
             ui_scale: 100,
             panes_filled: [false; 4],
+            pane_filter: Default::default(),
             folder_image: -1,
         }
     }
@@ -285,7 +299,7 @@ impl MainFrame {
             WM_CREATE => Self::on_create(hwnd, lp),
             WM_SIZE => Self::on_size(hwnd, wp, lp),
             WM_PAINT => Self::on_paint(hwnd),
-            WM_COMMAND => Self::on_command(hwnd, wp),
+            WM_COMMAND => Self::on_command(hwnd, wp, lp),
             WM_NOTIFY => {
                 if let Some(frame) = Self::frame_of(hwnd) {
                     frame.on_notify(hwnd, lp)
@@ -492,8 +506,36 @@ impl MainFrame {
         LRESULT(0)
     }
 
-    unsafe fn on_command(hwnd: HWND, wp: WPARAM) -> LRESULT {
+    unsafe fn on_command(hwnd: HWND, wp: WPARAM, lp: LPARAM) -> LRESULT {
         let id = (wp.0 & 0xFFFF) as u32;
+        let notify = ((wp.0 >> 16) & 0xFFFF) as u32;
+        // 窗格过滤框 EN_CHANGE（id=pane_base+3，768）：读文本、重灌该窗格。
+        if (1000..1400).contains(&id)
+            && (id - 1000) % 100 == CID_FILTER_EDIT as u32
+            && notify == EN_CHANGE
+        {
+            let idx = ((id - 1000) / 100) as usize;
+            if let Some(frame) = Self::frame_of(hwnd) {
+                // 优先读 lParam 发件人句柄（Edit 自发 EN_CHANGE 时=控件自身）；
+                // 外部投递 lParam=0 时回落 stored。
+                let sender = HWND(lp.0 as *mut core::ffi::c_void);
+                let target = if !sender.is_invalid() {
+                    sender
+                } else {
+                    let Some(e) = frame.panes.get(idx).and_then(|p| p.filter_edit) else {
+                        return LRESULT(0);
+                    };
+                    e
+                };
+                let mut buf = [0u16; 260];
+                let n = GetWindowTextW(target, &mut buf);
+                let end = (n.max(0) as usize).min(buf.len());
+                frame.pane_filter[idx] = String::from_utf16_lossy(&buf[..end]);
+                println!("[qdir-rs] TEST 过滤 窗格{idx} q={:?}", frame.pane_filter[idx]);
+                frame.fill_pane(idx);
+            }
+            return LRESULT(0);
+        }
         // 全部菜单命令走分发模块（自绘 id 段 30000+，见 commands/menu）。
         if let Some(frame) = Self::frame_of(hwnd) {
             let menu = frame.menu;
@@ -813,6 +855,18 @@ impl MainFrame {
                         sorted.push(entries.remove(pos));
                     }
                 }
+                // 快速过滤（Explorer 搜索框惯例，*原版行为待复核*）：
+                // 按窗格过滤框文本做大小写无关「包含」筛选。
+                let q = self.pane_filter[index].clone();
+                let sorted: Vec<(FileItem, FileItemExt)> = if q.trim().is_empty() {
+                    sorted
+                } else {
+                    let ql = q.trim().to_lowercase();
+                    sorted
+                        .into_iter()
+                        .filter(|(i, _)| i.name.to_lowercase().contains(&ql))
+                        .collect()
+                };
                 unsafe { populate_list(hwnd, &mut self.icons, &sorted) };
                 unsafe { populate_pane_chrome(self, index, &path, sorted.len()) };
                 // 行序→路径映射：命令分发按选中行号取路径。
@@ -843,6 +897,27 @@ impl MainFrame {
                     self.build_tree(index);
                 }
                 self.tree_sync_to_path(index);
+                // 验证钩子：QDIR_TEST_FILTER=文本 → 同进程写入窗格0过滤框并读回，
+                // 断言 GetWindowTextW 同进程语义（跨进程探针无法区分读写方）。
+                if index == 0 && std::env::var("QDIR_TEST_FILTER").is_ok()
+                    && FILTER_PROBE_ONCE
+                        .compare_exchange(false, true, std::sync::atomic::Ordering::SeqCst, std::sync::atomic::Ordering::SeqCst)
+                        .is_ok()
+                {
+                    let q = std::env::var("QDIR_TEST_FILTER").unwrap();
+                    if let Some(e) = self.panes[0].filter_edit {
+                        let wz: Vec<u16> = q.encode_utf16().chain(std::iter::once(0)).collect();
+                        let set_ok = unsafe { SetWindowTextW(e, PCWSTR::from_raw(wz.as_ptr())) };
+                        let mut back = [0u16; 64];
+                        let n = unsafe { GetWindowTextW(e, &mut back) };
+                        println!(
+                            "[qdir-rs] TEST 过滤探针 set={:?} readback n={} text={:?}",
+                            set_ok,
+                            n,
+                            String::from_utf16_lossy(&back[..n.max(0).min(64) as usize])
+                        );
+                    }
+                }
                 // 验证钩子：QDIR_TEST_TREE_SELECT=1 → 展开首个盘根并选中其第一个
                 // 子目录，走完整 TVN_SELCHANGED→navigate 链（同进程安全）。
                 if std::env::var("QDIR_TEST_TREE_SELECT").is_ok()

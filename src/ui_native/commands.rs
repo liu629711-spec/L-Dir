@@ -153,6 +153,47 @@ pub unsafe fn dispatch(frame: &mut MainFrame, main: HWND, id: u32) -> bool {
             }
             true
         }
+        cmd_id::FILE_EXPORT => {
+            // 导出列表（附录 A.1：原 0x8030=收集活动窗格列表→TXT/CSV/HTML/XLS）。
+            // 导出整个活动窗格当前列表（原版行为：非选中项，是全表）。
+            // 钩子：QDIR_TEST_EXPORT=<out.csv> 时跳过对话框直接导出（冒烟安全）。
+            let path = match std::env::var("QDIR_TEST_EXPORT") {
+                Ok(p) if !p.trim().is_empty() => std::path::PathBuf::from(p.trim()),
+                _ => {
+                    let Some(p) = run_export_dialog(main) else { return true };
+                    p
+                }
+            };
+            let fmt = crate::services::export::format_from_ext(
+                path.extension().and_then(|e| e.to_str()).unwrap_or("txt"),
+            )
+            .unwrap_or(crate::core::ExportFormat::Txt);
+            let pane = &frame.session.panes[pane_idx];
+            let tab = match pane.tabs.get(pane.tabs_pos) {
+                Some(t) => t,
+                None => return true,
+            };
+            let opts = crate::shell::EnumOptions {
+                include_hidden: true,
+                want_icon_index: false,
+                want_display_info: false,
+            };
+            match crate::shell::list_directory(&tab.path, &opts) {
+                Ok(mut items) => {
+                    crate::core::sort_items(&mut items, tab.sort_key, tab.sort_dir);
+                    let eo = crate::services::export::ExportOptions::default();
+                    match crate::services::export::write_export(&path, &items, fmt, &eo) {
+                        Ok(()) => println!(
+                            "[qdir-rs] TEST 导出 {path:?} fmt={fmt:?} {} 项",
+                            items.len()
+                        ),
+                        Err(e) => eprintln!("[qdir-rs] 导出失败：{e}"),
+                    }
+                }
+                Err(e) => eprintln!("[qdir-rs] 导出读取目录失败：{e}"),
+            }
+            true
+        }
         cmd_id::FILE_EXIT => {
             let _ = PostMessageW(Some(main), WM_CLOSE, WPARAM(0), LPARAM(0));
             true
@@ -445,7 +486,45 @@ fn run_state_dialog(main: HWND, save: bool) -> Option<std::path::PathBuf> {
     }
 }
 
-/// 12 档布局弹出菜单（光标锚点；原版为按钮下沿 TrackPopupMenu）。
+/// 导出保存对话框：四档 filter（TXT/CSV/HTML/XLS），默认 .txt。
+fn run_export_dialog(main: HWND) -> Option<std::path::PathBuf> {
+    let mut buf = [0u16; 260];
+    let mut filter: Vec<u16> = Vec::new();
+    for (desc, pat) in [
+        ("文本文件 (*.txt)", "*.txt"),
+        ("CSV (*.csv)", "*.csv"),
+        ("HTML (*.html)", "*.htm;*.html"),
+        ("Excel XML (*.xls)", "*.xls"),
+    ] {
+        filter.extend(desc.encode_utf16().chain(std::iter::once(0)));
+        filter.extend(pat.encode_utf16().chain(std::iter::once(0)));
+    }
+    filter.push(0);
+    let mut ofn = OPENFILENAMEW::default();
+    ofn.lStructSize = core::mem::size_of::<OPENFILENAMEW>() as u32;
+    ofn.hwndOwner = main;
+    ofn.lpstrFilter = PCWSTR::from_raw(filter.as_ptr());
+    ofn.lpstrFile = PWSTR::from_raw(buf.as_mut_ptr());
+    ofn.nMaxFile = buf.len() as u32;
+    let defext: Vec<u16> = "txt".encode_utf16().chain(std::iter::once(0)).collect();
+    ofn.lpstrDefExt = PCWSTR::from_raw(defext.as_ptr());
+    ofn.lpstrTitle = PCWSTR::from_raw(
+        "导出列表"
+            .encode_utf16()
+            .chain(std::iter::once(0))
+            .collect::<Vec<u16>>()
+            .as_ptr(),
+    );
+    ofn.Flags = OFN_PATHMUSTEXIST | OFN_OVERWRITEPROMPT;
+    if unsafe { GetSaveFileNameW(&mut ofn) }.as_bool() {
+        let end = buf.iter().position(|&c| c == 0).unwrap_or(buf.len());
+        Some(std::path::PathBuf::from(String::from_utf16_lossy(&buf[..end])))
+    } else {
+        None
+    }
+}
+
+
 fn show_layout_menu(frame: &mut MainFrame, main: HWND) {
     let _ = frame;
     unsafe {

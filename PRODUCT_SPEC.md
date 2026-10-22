@@ -102,7 +102,22 @@ P1 必须（产品可用性），按行为表证据实现；P2 体验完整；P3
 7. 树显隐切换（0x806b/c 确证）、缩放档 60–200%（重排字体）、主题切换
    （33943 系…按自主配色实现，行为=改窗格底色规则）
 
-**P2** 高亮/过滤规则编辑对话框（自绘模板）、列表导出（export.rs 已有，接 UI）、
+**P2 部分已完成**
+- ✅ 列表导出接 UI（2026-10-22）：文件菜单「导出列表(&E)…」(30009)，
+  GetSaveFileNameW 四档 filter（TXT/CSV/HTML/XLS，默认 .txt），扩展名→格式
+  `export::format_from_ext`（纯函数单测）；导出**全窗格当前列表**（原版
+  0x8030 行为：非选中项），复用 sort_items 排序；QDIR_TEST_EXPORT 钩子
+  冒烟 146 项 CSV 落盘成功。
+- ✅ 窗格快速过滤（2026-10-22）：过滤框 EN_CHANGE（pane_base+3，通知码
+  768）经 pane_proc 上送→MainFrame::on_command 读发件人句柄文本→
+  `pane_filter[idx]` 存储→fill_pane 应用「大小写无关包含」筛名
+  （`core::filter_by_query` 纯函数单测；*原版 EN_CHANGE 处理器未反编译
+  确证，语义按 Explorer 搜索框惯例，待复核*）。QDIR_TEST_FILTER 钩子
+  实测 146→3 行（`.log` 命中当前目录 3 个日志）、清空恢复原状。
+  探针通道备注：跨进程手工投递 EN_CHANGE 时 GetWindowTextW 读空
+  （lParam 句柄跨进程无效），与原版拒绝外部 WM_COMMAND 同类限制，
+  行为验证一律走进程内钩子。
+- 高亮/过滤规则编辑对话框（自绘模板）、
 标签行为开关（双击关/中键关/提示气泡——分支确证）、打印、查找、
 颜色主题档位（自设计）、状态栏 5 段信息完善
 **P3** Shell 扩展菜单宿主、Everything/MS-Search 集成、多语言 UI（自有文案表）、
