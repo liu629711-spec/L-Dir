@@ -50,7 +50,8 @@ pub use fileops::{
     delete_one_fallback, empty_recycle_bin, move_file_fallback, move_files, move_files_with_config,
     new_folder, open_default, open_path_with, print_file, read_shortcut_target, recycle_bin_info,
     rename_path, send_by_mail, show_properties,
-};
+
+    print_paths,};
 pub use icons::{IconCache, IconImage, IconSize, icon_image_for_path, stock_icon, system_icon_index_for_path};
 pub use system::{shell_file_run, shell_shutdown_windows, spawn_terminal};
 pub use special::{

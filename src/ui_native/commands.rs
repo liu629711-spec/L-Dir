@@ -194,6 +194,23 @@ pub unsafe fn dispatch(frame: &mut MainFrame, main: HWND, id: u32) -> bool {
             }
             true
         }
+        cmd_id::FILE_PRINT => {
+            // 打印选中文件（shell `print` 动词）。原版命令 id 未反编译确证，
+            // 行为按 Explorer 右键打印惯例 *待复核*。无选中项时只留痕。
+            if selected.is_empty() {
+                println!("[qdir-rs] TEST 打印：无选中项");
+            } else {
+                let n = shell::print_paths(host, &selected);
+                println!("[qdir-rs] TEST 打印投递 {n}/{} 项", selected.len());
+            }
+            true
+        }
+        cmd_id::FIND => {
+            // 查找（F3）= 聚焦活动窗格过滤框（键入即快速筛名）。
+            frame.focus_filter_edit(pane_idx);
+            println!("[qdir-rs] TEST 查找：聚焦窗格{}过滤框", pane_idx + 1);
+            true
+        }
         cmd_id::FILE_EXIT => {
             let _ = PostMessageW(Some(main), WM_CLOSE, WPARAM(0), LPARAM(0));
             true

@@ -19,6 +19,8 @@ pub mod cmd_id {
     pub const FILE_RUN: u32 = 30007; // 运行…（系统运行对话框）
     pub const FILE_EXIT: u32 = 30008; // 退出
     pub const FILE_EXPORT: u32 = 30009; // 导出列表…（原 0x8030=32816）
+    pub const FILE_PRINT: u32 = 30010; // 打印（原版菜单项确证存在；id 未确证*待复核*）
+    pub const FIND: u32 = 30011; // 查找 F3（=聚焦活动窗格过滤框；原版 id 未确证*待复核*）
     // 查看
     pub const VIEW_ICON: u32 = 30021;
     pub const VIEW_SMALL_ICON: u32 = 30022;
@@ -81,6 +83,8 @@ pub fn build_main_menu() -> windows::core::Result<HMENU> {
     add(m, "PowerShell(&P)", cmd_id::FILE_POWERSHELL);
     add(m, "运行(&R)…", cmd_id::FILE_RUN);
     add(m, "导出列表(&E)…", cmd_id::FILE_EXPORT);
+    add(m, "打印(&R)", cmd_id::FILE_PRINT);
+    add(m, "查找(&F)", cmd_id::FIND);
     let _ = unsafe { AppendMenuW(m, MF_SEPARATOR, 0, PCWSTR::null()) };
     add(m, "退出(&X)", cmd_id::FILE_EXIT);
 

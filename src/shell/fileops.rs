@@ -211,6 +211,21 @@ pub fn open_default(hwnd: HostWindow, path: &Path) -> QResult<()> {
     open_path_with(hwnd, path, "open", None)
 }
 
+/// 打印一组文件（shell `print` 动词，逐个交给关联程序）。
+/// 返回成功投递的数量；单个失败（无关联/无 print 动词）跳过不阻断。
+///
+/// 注：原版打印命令 id 未反编译确证（*待复核*）；语义按 Explorer 右键
+/// 「打印」惯例：选中文件逐个 shell print。
+pub fn print_paths(hwnd: HostWindow, paths: &[std::path::PathBuf]) -> usize {
+    let mut ok = 0;
+    for p in paths {
+        if open_path_with(hwnd, p, "print", None).is_ok() {
+            ok += 1;
+        }
+    }
+    ok
+}
+
 /// 通过电子邮件发送（命令按钮「通过电子邮件发送」）。
 ///
 /// 走 Windows Shell 的 `mail` 动词（MAPI 外壳扩展；无邮件客户端时由

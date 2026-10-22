@@ -98,7 +98,16 @@ impl App {
             // 0.62 无 UpdateWindow（RedrawWindow 取代）：WM_PAINT 会被自动调度。
             let _ = hwnd;
 
-            // 9. 消息循环。
+            // 9. 加速键：F3=查找（聚焦活动窗格过滤框，与文件菜单 FIND 同命令）。
+            let accels: Vec<ACCEL> = vec![ACCEL {
+                fVirt: FVIRTKEY,
+                key: windows::Win32::UI::Input::KeyboardAndMouse::VK_F3.0,
+                cmd: crate::ui_native::menu::cmd_id::FIND as u16,
+            }];
+            let accel_table = unsafe { CreateAcceleratorTableW(&accels) }
+                .unwrap_or(windows::Win32::UI::WindowsAndMessaging::HACCEL::default());
+
+            // 10. 消息循环。
             let mut msg = MSG::default();
             let mut exit_code = 0i32;
             loop {
@@ -107,9 +116,16 @@ impl App {
                     exit_code = msg.wParam.0 as i32;
                     break;
                 }
+                // 加速键优先（原版 F3 行为）。
+                if !accel_table.is_invalid()
+                    && unsafe { TranslateAcceleratorW(hwnd, accel_table, &msg) } != 0
+                {
+                    continue;
+                }
                 let _ = TranslateMessage(&msg);
                 DispatchMessageW(&msg);
             }
+            unsafe { let _ = DestroyAcceleratorTable(accel_table); };
 
             // 10. 反初始化（逆序）。
             OleUninitialize();
