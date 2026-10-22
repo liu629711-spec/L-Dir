@@ -2,3 +2,4 @@ target/
 *.log
 Q-Dir.ini
 start.qdr
+L-dirqdir-rsexport_hook.csv
