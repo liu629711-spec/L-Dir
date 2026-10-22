@@ -34,6 +34,9 @@ pub mod cmd_id {
     pub const VIEW_FIT_COL: u32 = 30027;
     pub const VIEW_REFRESH: u32 = 30028;
     pub const VIEW_PREVIEW_TOGGLE: u32 = 30034; // 预览面板 Vorschau 开关
+    // 规则编辑（附录 A.1：原版窗格按钮 tooltip「过滤器或高亮」+ 查看系；
+    // 原版 id 未反编译确证*待复核*，此处自定 30035）
+    pub const RULES_EDIT: u32 = 30035;
     pub const VIEW_TREE_TOGGLE: u32 = 30029;
     // 树模式三档 + 循环（附录 A.3：原 54001/54002/54003/54006 系）。
     pub const VIEW_TREE_SPLIT: u32 = 30030; // tree_mode=1 双列
@@ -119,6 +122,7 @@ pub fn build_main_menu() -> windows::core::Result<HMENU> {
     add(vm, "详细信息(&D)", cmd_id::VIEW_DETAILS);
     add(v, "显示网格线(&G)", cmd_id::VIEW_GRIDLINES);
     add(v, "预览面板(&P)", cmd_id::VIEW_PREVIEW_TOGGLE);
+    add(v, "高亮/着色规则(&K)…", cmd_id::RULES_EDIT);
     let _ = unsafe { AppendMenuW(v, MF_SEPARATOR, 0, PCWSTR::null()) };
     add(v, "列宽自适应（含列头）(&W)", cmd_id::VIEW_FIT_COL_HEADER);
     add(v, "列宽自适应(&H)", cmd_id::VIEW_FIT_COL);

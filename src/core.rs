@@ -386,7 +386,7 @@ pub enum RulePattern {
 
 impl RulePattern {
     /// ini 字段 [1] 的文本形式。
-    fn as_ini(&self) -> String {
+    pub fn as_ini(&self) -> String {
         match self {
             RulePattern::Hidden => "#Hidden".to_string(),
             RulePattern::Dir => "#DIR".to_string(),
@@ -404,7 +404,7 @@ impl RulePattern {
     }
 
     /// 从 ini 字段 [1] 解析模式；无法识别时按通配符列表处理。
-    fn parse_ini(s: &str) -> Self {
+    pub fn parse_ini(s: &str) -> Self {
         match s {
             "#Hidden" => RulePattern::Hidden,
             "#DIR" => RulePattern::Dir,

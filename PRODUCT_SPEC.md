@@ -168,9 +168,26 @@ P1 必须（产品可用性），按行为表证据实现；P2 体验完整；P3
   回写循环 set_in_place→set（与预览项同类缺陷：新 .qdr 缺键时静默丢
   分割位置；等值保留 5003 的 continue 分支不变）。
 
-- 高亮/过滤规则编辑对话框（自绘模板）、
-标签行为开关（双击关/中键关/提示气泡——分支确证）、打印、查找、
-颜色主题档位（自设计）、状态栏 5 段信息完善
+- ✅ 高亮/着色规则编辑对话框（2026-10-22）：`ui_native::rules_dialog`——
+  R1 合规方案：不加载原版 57 个 DLGTEMPLATE 中的任何字节，改为**手工构建
+  经典 DLGTEMPLATE WORD 流**经 `DialogBoxIndirectParamW` 创建（模态/Tab 序/
+  Esc·Enter/DLU 缩放由系统提供）。结构：主框 = SysListView32（列 启用·模式·
+  颜色，LVS_EX_FULLROWSELECT|GRIDLINES）+ 上移/下移/添加/删除/编辑/确定/取消；
+  条目框（嵌套模态）= 启用复选 + 模式通配串 Edit + 十六进制色 Edit +
+  选色(ChooseColorW CC_RGBINIT|CC_FULLOPEN) + 默认 + 确定/取消。数据模型全程
+  复用已确证的 core::RuleSet（「第一条命中即生效」，纯决策早已单测）；
+  确定后 `renumber`（index=显示顺序=优先级）→ `save_config` 写回实际 ini 路径
+  → 重灌四窗格即时刷新行色。入口：查看菜单「高亮/着色规则(&K)…」30035
+  （原版对话框 id/布局未反编译确证，控件排布自设计 *待复核*）+ PendingFrame/
+  MainFrame 增 `ini_path` 管线（main.rs→app.rs 透传实际加载路径，兼容 R2
+  回落文件也可保存）。单测 7 个：移动/增删边界、index 重排、显示映射、
+  COLORREF BGR 往返、模板头字节布局（style/ex/cdit/caption/DS_SETFONT 逐字
+  断言）、首项 DWORD 对齐+原子类写法。端到端：QDIR_TEST_RULES_UI 钩子实测
+  「行数=12 规则数=12 控件 list..cancel 全 true」+ 提交链「TEST 规则已保存
+  12 条 -> "Q-Dir.ini"」、对话框关闭无残留（#32770 枚举确认）。
+
+- 剩余 P2：状态栏 5 段信息完善、设置对话框（tree_*/tab_* keys）。（高亮/
+着色规则编辑、标签行为开关、打印、查找、颜色主题档位已完成，见上。）
 **P3** Shell 扩展菜单宿主、Everything/MS-Search 集成、多语言 UI（自有文案表）、
 便携/安装版差异、托盘行为、开机恢复、拖放精修
 

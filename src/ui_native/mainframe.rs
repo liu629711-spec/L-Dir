@@ -195,18 +195,25 @@ pub fn dir_of_selection(
 ///
 /// WM_CREATE 在 CreateWindowExW **返回之前**触发，配置只能经 lpCreateParams 送入。
 pub struct PendingFrame {
-    payload: Option<(Config, SessionState, HINSTANCE)>,
+    payload: Option<(Config, SessionState, HINSTANCE, std::path::PathBuf)>,
 }
 
 impl PendingFrame {
-    pub fn new(config: Config, session: SessionState, hinstance: HINSTANCE) -> Self {
+    pub fn new(
+        config: Config,
+        session: SessionState,
+        hinstance: HINSTANCE,
+        ini_path: std::path::PathBuf,
+    ) -> Self {
         PendingFrame {
-            payload: Some((config, session, hinstance)),
+            payload: Some((config, session, hinstance, ini_path)),
         }
     }
 
     /// 取出载荷；重复调用返回 None。
-    pub fn take(&mut self) -> Option<(Config, SessionState, HINSTANCE)> {
+    pub fn take(
+        &mut self,
+    ) -> Option<(Config, SessionState, HINSTANCE, std::path::PathBuf)> {
         self.payload.take()
     }
 }
@@ -254,6 +261,8 @@ struct PaneWindows {
 pub struct MainFrame {
     pub config: Config,
     pub session: SessionState,
+    /// 配置文件的实际加载路径（规则编辑确定后写回此处）。
+    pub ini_path: std::path::PathBuf,
     /// 四窗格子窗口。
     pub panes: [PaneWindows; 4],
     /// 横向分割组（三条竖直分割条切四窗格）。
@@ -281,10 +290,16 @@ pub struct MainFrame {
 }
 
 impl MainFrame {
-    pub fn new(config: Config, session: SessionState, _hinstance: HINSTANCE) -> Self {
+    pub fn new(
+        config: Config,
+        session: SessionState,
+        _hinstance: HINSTANCE,
+        ini_path: std::path::PathBuf,
+    ) -> Self {
         MainFrame {
             config,
             session,
+            ini_path,
             panes: Default::default(),
             splitters: SplitterGroup::horizontal(4),
             menu: HMENU::default(),
@@ -329,7 +344,7 @@ impl MainFrame {
 
     unsafe fn on_create(hwnd: HWND, lp: LPARAM) -> LRESULT {
         // 从 CREATESTRUCT.lpCreateParams 取回真实配置（取一次即空）。
-        let mut taken: Option<(Config, SessionState, HINSTANCE)> = None;
+        let mut taken: Option<(Config, SessionState, HINSTANCE, std::path::PathBuf)> = None;
         let mut hmenu = HMENU::default();
         if lp.0 != 0 {
             let cs = &*(lp.0 as *const CREATESTRUCTW);
@@ -339,10 +354,16 @@ impl MainFrame {
                 taken = pending.take();
             }
         }
-        let (config, session, hinstance) = taken
-            .unwrap_or_else(|| (Config::default(), SessionState::default(), HINSTANCE::default()));
+        let (config, session, hinstance, ini_path) = taken.unwrap_or_else(|| {
+            (
+                Config::default(),
+                SessionState::default(),
+                HINSTANCE::default(),
+                std::path::PathBuf::from(crate::brand::INI_FILE),
+            )
+        });
 
-        let frame = Box::leak(Box::new(MainFrame::new(config, session, hinstance)));
+        let frame = Box::leak(Box::new(MainFrame::new(config, session, hinstance, ini_path)));
         frame.menu = hmenu;
         SetWindowLongPtrW(hwnd, GWLP_USERDATA, frame as *mut _ as isize);
         unsafe { crate::ui_native::subclass::set_main_hwnd(hwnd) };

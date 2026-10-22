@@ -29,7 +29,11 @@ pub mod once_cell_sync {
 pub struct App;
 
 impl App {
-    pub fn run(config: Config, session: SessionState) -> std::result::Result<i32, Box<dyn std::error::Error>> {
+    pub fn run(
+        config: Config,
+        session: SessionState,
+        ini_path: std::path::PathBuf,
+    ) -> std::result::Result<i32, Box<dyn std::error::Error>> {
         unsafe {
             // 1. COM/Ole（顺序照抄 0x4e5f20）。
             let _ = CoInitialize(None);
@@ -70,7 +74,7 @@ impl App {
             //    config/session 经 lpCreateParams 传入：WM_CREATE 在 CreateWindowExW
             //    返回之前就触发，只有这样才能让 on_create 用真实配置建 frame。
             let (w, h) = (config.win_rc[2].max(200), config.win_rc[3].max(150));
-            let mut pending = PendingFrame::new(config, session, hinstance);
+            let mut pending = PendingFrame::new(config, session, hinstance, ini_path);
             // 窗口标题宽串（w! 仅字面量，品牌常量经静态缓冲转换）。
             let title: Vec<u16> = crate::brand::PRODUCT_NAME
                 .encode_utf16()

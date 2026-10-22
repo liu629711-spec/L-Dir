@@ -211,6 +211,10 @@ pub unsafe fn dispatch(frame: &mut MainFrame, main: HWND, id: u32) -> bool {
             println!("[qdir-rs] TEST 查找：聚焦窗格{}过滤框", pane_idx + 1);
             true
         }
+        cmd_id::RULES_EDIT => {
+            run_rules_dialog(frame, main);
+            true
+        }
         cmd_id::FILE_RESTART | cmd_id::FILE_RESTART_ADMIN => {
             let admin = id == cmd_id::FILE_RESTART_ADMIN;
             restart_self(frame, main, admin);
@@ -594,6 +598,26 @@ fn apply_session(frame: &mut MainFrame, st: crate::core::SessionState) {
 
 /// 重新启动（附录 A.1 确证 0xBD77：存状态→退出的组合链；管理员=0xBD75
 /// runas 单步）。新实例加载当前 exe 同目录的状态文件（原版 start2.qdr 同位）。
+/// 高亮/着色规则编辑：模态对话框（rules_dialog），确定后写回
+/// `Config.rules` 并持久化到实际 ini 路径，再重灌四窗格刷新行色。
+fn run_rules_dialog(frame: &mut MainFrame, main: HWND) {
+    let Some(new_rules) =
+        (unsafe { crate::ui_native::rules_dialog::edit_rules(main, &frame.config.rules) })
+    else {
+        println!("[qdir-rs] TEST 规则编辑：取消");
+        return;
+    };
+    let n = new_rules.rules.len();
+    frame.config.rules = new_rules;
+    match crate::config::save_config(&frame.ini_path, &frame.config) {
+        Ok(()) => println!("[qdir-rs] TEST 规则已保存 {n} 条 -> {:?}", frame.ini_path),
+        Err(e) => eprintln!("[qdir-rs] 规则保存失败：{e}"),
+    }
+    for i in 0..4 {
+        unsafe { frame.fill_pane(i) };
+    }
+}
+
 fn restart_self(frame: &mut MainFrame, main: HWND, as_admin: bool) {
     let exe = match std::env::current_exe() {
         Ok(e) => e,

@@ -57,7 +57,7 @@ fn main() -> std::process::ExitCode {
     }
 
     // 默认：原生 Win32 路线（1:1 复刻）。
-    match qdir_rs::ui_native::App::run(config, session) {
+    match qdir_rs::ui_native::App::run(config, session, ini_path) {
         Ok(code) => std::process::ExitCode::from(code as u8),
         Err(e) => {
             eprintln!("[l-dir] 运行失败：{e}");
