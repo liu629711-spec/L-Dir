@@ -54,6 +54,9 @@ pub mod cmd_id {
     pub const FAV_MANAGE: u32 = 30101;
     // 选项
     pub const OPTIONS_SETTINGS: u32 = 30210; // 设置…（tree_*/tab_*/文件操作）
+    // 托盘右键菜单（自有 id）
+    pub const TRAY_SHOW: u32 = 30220;
+    pub const TRAY_EXIT: u32 = 30221;
     // 帮助
     pub const ABOUT: u32 = 30200;
     // 布局弹出菜单 12 档（Layout::ALL 序）
@@ -92,6 +95,15 @@ pub fn theme_palette(idx: u32) -> Option<(crate::core::Rgb, Option<crate::core::
         4 => Some((Rgb(0x00, 0x18, 0x08), Some(Rgb(0x00, 0xD9, 0x4A)))), // matrix：黑底绿字
         _ => None,
     }
+}
+
+/// 托盘右键菜单（还原 / 退出）。
+pub fn build_tray_menu() -> windows::core::Result<HMENU> {
+    let m = unsafe { CreatePopupMenu() }?;
+    add(m, "打开 L-Dir(&O)", cmd_id::TRAY_SHOW);
+    let _ = unsafe { AppendMenuW(m, MF_SEPARATOR, 0, PCWSTR::null()) };
+    add(m, "退出(&X)", cmd_id::TRAY_EXIT);
+    Ok(m)
 }
 
 /// 构建主菜单（自绘文案与结构）。调用方持有返回的 HMENU 生命周期。

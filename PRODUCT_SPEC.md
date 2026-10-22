@@ -247,6 +247,27 @@ P1 必须（产品可用性），按行为表证据实现；P2 体验完整；P3
   独立确认 `L-Dir REG_SZ "…qdir-rs.exe"`）→重启→对话框「开机=true」+
   「Run 值=Some(true)」；删 Run 键后重启→初态「开机=false」回灌确证。
   冒烟后清理真实键 + ini 复位。285 lib + 11 全绿。
+
+- ✅ 托盘行为（P3，2026-10-22）：最小化到托盘 + 单击/双击还原 +
+  右键菜单。`shell::tray`（TrayIcon 封装 Shell_NotifyIconW add/modify/
+  delete、tray_event_from_message 事件映射）早已单测完备但**从未接入
+  ui_native**——本项接线。行为链*待复核*（原版托盘未反编译确证，
+  按行业惯例：最小化藏窗、双击还原、右键「打开/退出」）。
+  `config.tray_minimize`（[Start] `tray_minimize`）开关 + 设置对话框
+  「最小化到托盘」复选（IDC_TRAY_MIN）；ensure_modeled_keys 补写。
+  接线：`WM_TRAY=WM_APP+1` 回调消息；`make_tray` 懒建（LoadIconW 应用
+  图标 + set_tip 品牌名 + set_version_4，失败不吞事件回落系统最小化）；
+  `on_syscommand` 拦 SC_MINIMIZE（掩码 &0xFFF0）→ SW_HIDE；`on_tray_message`
+  经**纯函数 `tray_action_for`**（Select/DoubleClick→Restore，
+  ContextMenu→ShowMenu，其余 Ignore）分发；右键 TrackPopupMenu
+  （build_tray_menu：TRAY_SHOW 还原 / TRAY_EXIT 发 WM_CLOSE）；
+  WM_DESTROY 置空 tray → TrayIcon::drop → NIM_DELETE。
+  单测 `tray_action_mapping` 锁 7 事件映射。端到端（QDIR_TEST_TRAY，
+  钩子同时打开拦截开关）跨进程 PostMessage 实测（WM_SYSCOMMAND/
+  WM_TRAY 的 lParam 皆非指针，跨进程安全）：可见→SC_MINIMIZE→
+  IsWindowVisible=false（「TEST 托盘：最小化隐藏窗格主窗」）→
+  WM_TRAY|WM_LBUTTONDBLCLK→visible=true（「TEST 托盘还原 DoubleClick」）；
+  右键/中键分别「菜单」「忽略」日志确证。286 lib + 11 全绿。
 **P3** Shell 扩展菜单宿主、Everything/MS-Search 集成、多语言 UI（自有文案表）、
 便携/安装版差异、托盘行为、开机恢复、拖放精修
 

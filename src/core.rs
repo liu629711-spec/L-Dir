@@ -1272,6 +1272,8 @@ pub struct Config {
     /// 开机恢复：登录时自动启动（[Start] `startup` 键 + HKCU Run 值）。
     /// 原版启动行为链未反编译确证，键名自定 *待复核*。
     pub startup: bool,
+    /// 最小化到托盘（[Start] `tray_minimize`；原版托盘行为链未确证 *待复核*）。
+    pub tray_minimize: bool,
     // 目录树 / 标签页 / 文件操作
     pub tree: TreeConfig,
     pub tab: TabConfig,
@@ -1307,6 +1309,7 @@ impl Default for Config {
             preview_filter: "*;".to_string(),
             rules: default_rules(),
             startup: false,
+            tray_minimize: false,
             tree: TreeConfig::default(),
             tab: TabConfig::default(),
             file_ops: FileOpsConfig::default(),

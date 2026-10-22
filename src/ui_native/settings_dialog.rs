@@ -42,6 +42,7 @@ const IDC_TAB_WMODE_FIXED: i32 = 315;
 const IDC_TAB_WMODE_AUTO: i32 = 316;
 
 const IDC_STARTUP: i32 = 325;
+const IDC_TRAY_MIN: i32 = 326;
 
 const GRP_OPS: i32 = 320;
 const IDC_OPS_MOVECONF: i32 = 321;
@@ -62,6 +63,8 @@ const RES_OK: isize = 1;
 pub struct SettingsState {
     /// 开机恢复（登录时启动；同时是 HKCU Run 值的期望态）。
     pub startup: bool,
+    /// 最小化到托盘。
+    pub tray_minimize: bool,
     pub tree_noexpando: bool,
     pub tree_single_expand: bool,
     pub tree_fullrow: bool,
@@ -83,6 +86,7 @@ pub struct SettingsState {
 pub fn state_from_config(cfg: &Config) -> SettingsState {
     SettingsState {
         startup: cfg.startup,
+        tray_minimize: cfg.tray_minimize,
         tree_noexpando: cfg.tree.no_expando,
         tree_single_expand: cfg.tree.single_expand,
         tree_fullrow: cfg.tree.fullrowselect,
@@ -104,6 +108,7 @@ pub fn state_from_config(cfg: &Config) -> SettingsState {
 /// 对话框状态 → 写回 config（纯函数，单测；只覆盖对应键）。
 pub fn apply_state(cfg: &mut Config, st: &SettingsState) {
     cfg.startup = st.startup;
+    cfg.tray_minimize = st.tray_minimize;
     cfg.tree.no_expando = st.tree_noexpando;
     cfg.tree.single_expand = st.tree_single_expand;
     cfg.tree.fullrowselect = st.tree_fullrow;
@@ -220,8 +225,9 @@ pub fn items() -> Vec<ItemDef<'static>> {
     ));
     v.push(ItemDef::button("自适应宽", IDC_TAB_WMODE_AUTO, 200, 130, 70, BS_AUTORADIOBUTTON as u32));
     // —— 文件操作 ——
-    v.push(group("常规与文件操作", 7, 180, 300, 70));
-    v.push(checkbox("开机恢复（登录时启动）", IDC_STARTUP, 16, 196, 160));
+    v.push(group("常规与文件操作", 7, 180, 300, 78));
+    v.push(checkbox("开机恢复（登录时启动）", IDC_STARTUP, 16, 194, 150));
+    v.push(checkbox("最小化到托盘", IDC_TRAY_MIN, 170, 194, 110));
     v.push(checkbox("移动前确认", IDC_OPS_MOVECONF, 16, 212, 90));
     v.push(checkbox("刷新保持选择", IDC_OPS_KEEPSEL, 110, 212, 100));
     v.push(checkbox("向上选中上次项", IDC_OPS_SELECTLAST, 214, 196, 90));
@@ -327,6 +333,7 @@ unsafe extern "system" fn proc(hdlg: HWND, msg: u32, wp: WPARAM, lp: LPARAM) -> 
             set_check(hdlg, IDC_TAB_WMODE_FIXED, st.tab_width_mode == 0);
             set_check(hdlg, IDC_TAB_WMODE_AUTO, st.tab_width_mode == 1);
             set_check(hdlg, IDC_STARTUP, st.startup);
+            set_check(hdlg, IDC_TRAY_MIN, st.tray_minimize);
             set_check(hdlg, IDC_OPS_MOVECONF, st.ops_move_conf);
             set_check(hdlg, IDC_OPS_KEEPSEL, st.ops_keep_sel);
             set_check(hdlg, IDC_OPS_SELECTLAST, st.ops_select_last);
@@ -360,6 +367,7 @@ unsafe extern "system" fn proc(hdlg: HWND, msg: u32, wp: WPARAM, lp: LPARAM) -> 
                     st.tree_noexpando = true;
                     st.tree_indent = 30;
                     st.startup = true;
+                    st.tray_minimize = true;
                 }
                 OUT_SETTINGS.with(|o| *o.borrow_mut() = Some(st));
                 let _ = EndDialog(hdlg, RES_OK);
@@ -373,6 +381,7 @@ unsafe extern "system" fn proc(hdlg: HWND, msg: u32, wp: WPARAM, lp: LPARAM) -> 
                     if let Some(ctx) = ctx_of(hdlg) {
                         let mut st = ctx.st;
                         st.startup = get_check(hdlg, IDC_STARTUP, st.startup);
+                        st.tray_minimize = get_check(hdlg, IDC_TRAY_MIN, st.tray_minimize);
                         st.tree_noexpando = get_check(hdlg, IDC_TREE_NOEXPANDO, st.tree_noexpando);
                         st.tree_single_expand =
                             get_check(hdlg, IDC_TREE_SINGLEEXPAND, st.tree_single_expand);

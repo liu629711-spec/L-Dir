@@ -23,7 +23,10 @@ use windows::Win32::UI::WindowsAndMessaging::*;
 
 use crate::brand;
 use crate::core::{ColumnDef, Config, FileItem, PaneId, PaneState, SessionState, sort_items};
-use crate::shell::{EnumOptions, FileItemExt, IconCache, IconSize, list_directory_detailed};
+use crate::shell::{
+    EnumOptions, FileItemExt, HostWindow, IconCache, IconSize, TrayEvent, TrayIcon, is_tray_message,
+    list_directory_detailed, tray_event_from_message,
+};
 use crate::ui::pane::format_filetime;
 use crate::ui_native::splitter::{SPLITTER_WIDTH, SplitterGroup};
 use crate::ui_native::tree::{self, TreeNodes};
@@ -34,6 +37,26 @@ const LVS_REPORT_SHOWSEL: u32 = 0x0001 | 0x0008;
 
 /// 主窗口类名（自有，见 PRODUCT_SPEC R1）。
 pub const FRAME_CLASS_NAME: &str = brand::WINDOW_CLASS;
+
+/// 托盘回调消息（WM_APP+1；契约与 shell::tray 文档一致）。
+pub const WM_TRAY: u32 = 0x8001;
+
+/// 托盘事件 → 动作（纯函数单测；语义按 shell::tray 文档：
+/// 单击/双击还原，右键弹菜单，其余忽略）。
+#[derive(Clone, Copy, PartialEq, Eq, Debug)]
+pub enum TrayAction {
+    Restore,
+    ShowMenu,
+    Ignore,
+}
+
+pub fn tray_action_for(ev: &TrayEvent) -> TrayAction {
+    match ev {
+        TrayEvent::Select | TrayEvent::DoubleClick => TrayAction::Restore,
+        TrayEvent::ContextMenu => TrayAction::ShowMenu,
+        _ => TrayAction::Ignore,
+    }
+}
 
 /// 子窗口命令 ID 段（0..999 给系统内部，窗格从 1000 起）。
 const ID_FIRST_PANE: i32 = 1000;
@@ -265,6 +288,8 @@ pub struct MainFrame {
     pub main: HWND,
     /// 配置文件的实际加载路径（规则编辑确定后写回此处）。
     pub ini_path: std::path::PathBuf,
+    /// 托盘图标（P3：最小化到托盘 + 单击还原 + 右键菜单）。
+    pub tray: Option<TrayIcon>,
     /// 四窗格子窗口。
     pub panes: [PaneWindows; 4],
     /// 横向分割组（三条竖直分割条切四窗格）。
@@ -302,6 +327,7 @@ impl MainFrame {
             config,
             session,
             main: HWND::default(),
+            tray: None,
             ini_path,
             panes: Default::default(),
             splitters: SplitterGroup::horizontal(4),
@@ -330,6 +356,8 @@ impl MainFrame {
             WM_SIZE => Self::on_size(hwnd, wp, lp),
             WM_PAINT => Self::on_paint(hwnd),
             WM_COMMAND => Self::on_command(hwnd, wp, lp),
+            WM_SYSCOMMAND => Self::on_syscommand(hwnd, wp),
+            WM_TRAY => Self::on_tray_message(hwnd, lp),
             WM_NOTIFY => {
                 if let Some(frame) = Self::frame_of(hwnd) {
                     frame.on_notify(hwnd, lp)
@@ -338,11 +366,104 @@ impl MainFrame {
                 }
             }
             WM_DESTROY => {
+                // 托盘图标随窗销毁（TrayIcon::drop → NIM_DELETE）。
+                if let Some(frame) = Self::frame_of(hwnd) {
+                    frame.tray = None;
+                }
                 PostQuitMessage(0);
                 LRESULT(0)
             }
             _ => DefWindowProcW(hwnd, msg, wp, lp),
         }
+    }
+
+    /// 最小化拦截：tray_minimize 开 → 藏窗（懒加托盘图标）吞事件；
+    /// 关 → 默认任务栏最小化。原版托盘行为未反编译确证 *待复核*。
+    unsafe fn on_syscommand(hwnd: HWND, wp: WPARAM) -> LRESULT {
+        if (wp.0 as u32) & 0xFFF0 == SC_MINIMIZE {
+            let tray_on = Self::frame_of(hwnd).map(|f| f.config.tray_minimize).unwrap_or(false);
+            if tray_on {
+                if let Some(frame) = Self::frame_of(hwnd) {
+                    if frame.tray.is_none() {
+                        frame.tray = Self::make_tray(hwnd);
+                    }
+                    if frame.tray.is_some() {
+                        let _ = ShowWindow(hwnd, SW_HIDE);
+                        println!("[qdir-rs] TEST 托盘：最小化隐藏窗格主窗");
+                        return LRESULT(0);
+                    }
+                }
+                // 图标添加失败不吞事件（回落系统最小化）。
+                eprintln!("[qdir-rs] 托盘添加失败，回落普通最小化");
+            }
+        }
+        DefWindowProcW(hwnd, WM_SYSCOMMAND, wp, LPARAM(0))
+    }
+
+    /// 懒创建托盘图标并 add（HICON=应用图标，与主窗类一致）。
+    fn make_tray(hwnd: HWND) -> Option<TrayIcon> {
+        let hicon = unsafe { LoadIconW(None, IDI_APPLICATION).unwrap_or_default() };
+        let mut t = TrayIcon::new(HostWindow::from_raw_hwnd(hwnd.0 as isize), 1, WM_TRAY, hicon);
+        match t.add().and_then(|_| t.set_tip(brand::PRODUCT_NAME)).and_then(|_| {
+            t.set_version_4()
+        }) {
+            Ok(()) => Some(t),
+            Err(e) => {
+                eprintln!("[qdir-rs] 托盘 add 失败：{e}");
+                None
+            }
+        }
+    }
+
+    unsafe fn on_tray_message(hwnd: HWND, lp: LPARAM) -> LRESULT {
+        let Some(frame) = Self::frame_of(hwnd) else {
+            return LRESULT(0);
+        };
+        if !frame.tray.as_ref().is_some_and(|t| is_tray_message(WM_TRAY, t.callback_message())) {
+            return LRESULT(0);
+        }
+        let ev = tray_event_from_message(WM_TRAY, lp.0);
+        match tray_action_for(&ev) {
+            TrayAction::Restore => {
+                let _ = ShowWindow(hwnd, SW_RESTORE);
+                let _ = SetForegroundWindow(hwnd);
+                println!("[qdir-rs] TEST 托盘还原 {ev:?}");
+            }
+            TrayAction::ShowMenu => {
+                println!("[qdir-rs] TEST 托盘右键菜单");
+                let menu = match crate::ui_native::menu::build_tray_menu() {
+                    Ok(m) => m,
+                    Err(_) => return LRESULT(0),
+                };
+                let mut pt = POINT::default();
+                let _ = GetCursorPos(&mut pt);
+                let _ = SetForegroundWindow(hwnd);
+                let cmd = TrackPopupMenu(
+                    menu,
+                    TPM_RETURNCMD | TPM_LEFTALIGN | TPM_TOPALIGN,
+                    pt.x,
+                    pt.y,
+                    None,
+                    hwnd,
+                    None,
+                );
+                let _ = DestroyMenu(menu);
+                match cmd.0 {
+                    c if c == crate::ui_native::menu::cmd_id::TRAY_SHOW as i32 => {
+                        let _ = ShowWindow(hwnd, SW_RESTORE);
+                        let _ = SetForegroundWindow(hwnd);
+                    }
+                    c if c == crate::ui_native::menu::cmd_id::TRAY_EXIT as i32 => {
+                        let _ = PostMessageW(Some(hwnd), WM_CLOSE, WPARAM(0), LPARAM(0));
+                    }
+                    _ => {}
+                }
+            }
+            TrayAction::Ignore => {
+                println!("[qdir-rs] TEST 托盘事件忽略 {ev:?}");
+            }
+        }
+        LRESULT(0)
     }
 
     unsafe fn on_create(hwnd: HWND, lp: LPARAM) -> LRESULT {
@@ -403,6 +524,19 @@ impl MainFrame {
         // 3. 四个窗格：容器 + 状态栏 + 内容控件。
         for i in 0..4 {
             create_pane(frame, hwnd, hinstance, i);
+        }
+
+        // 托盘冒烟钩子：QDIR_TEST_TRAY=1 时立即添加图标并日志
+        // （行为链由外部 PostMessage WM_SYSCOMMAND/WM_TRAY 驱动，
+        // 两者 lParam 皆无指针，跨进程安全）。
+        if std::env::var("QDIR_TEST_TRAY").is_ok() {
+            // 钩子同时打开拦截开关（等价设置对话框勾选），测完整藏窗路径。
+            frame.config.tray_minimize = true;
+            if frame.tray.is_none() {
+                frame.tray = Self::make_tray(hwnd);
+            }
+            println!("[qdir-rs] TEST 托盘 add={} tip={:?}", frame.tray.is_some(),
+                frame.tray.as_ref().map(|t| t.tip().to_string()).unwrap_or_default());
         }
 
         // 端到端验证钩子：QDIR_TEST_DBLCLK_ROW 设置时对窗格1第 N 行
@@ -2785,7 +2919,21 @@ Rust + 原生 Win32",
 
 #[cfg(test)]
 mod interaction_tests {
-    use super::{column_sort_click, dir_of_selection, status_parts};
+    use super::{
+        column_sort_click, dir_of_selection, status_parts, tray_action_for, TrayAction,
+    };
+
+    #[test]
+    fn tray_action_mapping() {
+        use crate::shell::TrayEvent;
+        assert_eq!(tray_action_for(&TrayEvent::Select), TrayAction::Restore);
+        assert_eq!(tray_action_for(&TrayEvent::DoubleClick), TrayAction::Restore);
+        assert_eq!(tray_action_for(&TrayEvent::ContextMenu), TrayAction::ShowMenu);
+        assert_eq!(tray_action_for(&TrayEvent::MiddleClick), TrayAction::Ignore);
+        assert_eq!(tray_action_for(&TrayEvent::BalloonShow), TrayAction::Ignore);
+        assert_eq!(tray_action_for(&TrayEvent::BalloonClick), TrayAction::Ignore);
+        assert_eq!(tray_action_for(&TrayEvent::Other(9)), TrayAction::Ignore);
+    }
     use std::path::{Path, PathBuf};
 
     #[test]

@@ -60,6 +60,7 @@ mod KEYS {
     pub const START_CRASH: &str = "StartCrash";
     /// 开机恢复（自有键名 *待复核*；原版启动行为链未反编译确证）。
     pub const STARTUP: &str = "startup";
+    pub const TRAY_MINIMIZE: &str = "tray_minimize";
     pub const WIN_RC: &str = "WinRC";
     pub const DEFAULT_TAB: &str = "default_tab";
     pub const CHK_INI: &str = "chk_ini";
@@ -576,6 +577,7 @@ pub fn load_config_bytes(bytes: &[u8]) -> QResult<Config> {
     cfg.start_crash =
         get_bool(&doc, INI_SECTIONS::START, KEYS::START_CRASH, cfg.start_crash)?;
     cfg.startup = get_bool(&doc, INI_SECTIONS::START, KEYS::STARTUP, cfg.startup)?;
+    cfg.tray_minimize = get_bool(&doc, INI_SECTIONS::START, KEYS::TRAY_MINIMIZE, cfg.tray_minimize)?;
     if let Some(raw) = doc.get(INI_SECTIONS::START, KEYS::WIN_RC) {
         cfg.win_rc = parse_win_rc(KEYS::WIN_RC, raw)?;
     }
@@ -743,6 +745,7 @@ pub fn apply_config_to_doc(doc: &mut IniDocument, cfg: &Config) {
     doc.set_in_place(start, KEYS::SHOW_CMD, cfg.show_cmd.to_string());
     doc.set_in_place(start, KEYS::START_CRASH, bool_u8(cfg.start_crash).to_string());
     doc.set_in_place(start, KEYS::STARTUP, bool_u8(cfg.startup).to_string());
+    doc.set_in_place(start, KEYS::TRAY_MINIMIZE, bool_u8(cfg.tray_minimize).to_string());
     doc.set_in_place(
         start,
         KEYS::WIN_RC,
@@ -890,6 +893,9 @@ fn ensure_modeled_keys(doc: &mut IniDocument, cfg: &Config) {
     // 只收集「与默认值不同」的键。
     if cfg.startup != d.startup {
         pairs.push((KEYS::STARTUP, bool_u8(cfg.startup).to_string()));
+    }
+    if cfg.tray_minimize != d.tray_minimize {
+        pairs.push((KEYS::TRAY_MINIMIZE, bool_u8(cfg.tray_minimize).to_string()));
     }
     if cfg.tree.no_expando != d.tree.no_expando {
         pairs.push((KEYS::TREE_NO_EXPANDO, bool_u8(cfg.tree.no_expando).to_string()));
