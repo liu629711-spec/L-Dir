@@ -52,6 +52,8 @@ pub mod cmd_id {
     // 收藏夹
     pub const FAV_ADD: u32 = 30100;
     pub const FAV_MANAGE: u32 = 30101;
+    // 选项
+    pub const OPTIONS_SETTINGS: u32 = 30210; // 设置…（tree_*/tab_*/文件操作）
     // 帮助
     pub const ABOUT: u32 = 30200;
     // 布局弹出菜单 12 档（Layout::ALL 序）
@@ -153,6 +155,10 @@ pub fn build_main_menu() -> windows::core::Result<HMENU> {
     let fv = popup(file, "收藏夹(&A)");
     add(fv, "添加到收藏夹…(&N)", cmd_id::FAV_ADD);
     add(fv, "打开收藏夹文件夹(&O)", cmd_id::FAV_MANAGE);
+
+    // —— 选项 ——
+    let op = popup(file, "选项(&O)");
+    add(op, "设置(&S)…", cmd_id::OPTIONS_SETTINGS);
 
     // —— 帮助 ——
     let hp = popup(file, "帮助(&H)");

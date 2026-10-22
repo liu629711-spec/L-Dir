@@ -1602,4 +1602,25 @@ mod tests {
         let back = parse_view_state(&s).expect("可解析");
         assert_eq!(back.view_mode, c.view_mode);
     }
+    #[test]
+    fn ensure_modeled_keys_skips_defaults_and_appends_changes() {
+        // 原文件没有 tree_* 键：未改动的默认值不得补写；改过的必须补写。
+        let mut doc = IniDocument::parse("[Start]
+Als=5
+");
+        let mut cfg = Config::default();
+        apply_config_to_doc(&mut doc, &cfg);
+        let sec = doc.section("Start").unwrap();
+        assert!(sec.get("tree_indent_width").is_none(), "默认值不得补写");
+        // 改 indent_width（默认 20 -> 24）后补写。
+        cfg.tree.indent_width = 24;
+        cfg.tree.no_expando = true;
+        apply_config_to_doc(&mut doc, &cfg);
+        let sec = doc.section("Start").unwrap();
+        assert_eq!(sec.get("tree_indent_width"), Some("24"));
+        assert_eq!(sec.get("tree_no_expando"), Some("1"));
+        // 补写不破坏既有键序：Als 仍在，且没有未知键。
+        let keys: Vec<&str> = sec.entries.iter().filter_map(|e| e.key.as_deref()).collect();
+        assert!(keys.contains(&"Als"), "原键保留");
+    }
 }

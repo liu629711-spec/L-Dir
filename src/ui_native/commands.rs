@@ -211,6 +211,10 @@ pub unsafe fn dispatch(frame: &mut MainFrame, main: HWND, id: u32) -> bool {
             println!("[qdir-rs] TEST 查找：聚焦窗格{}过滤框", pane_idx + 1);
             true
         }
+        cmd_id::OPTIONS_SETTINGS => {
+            run_settings_dialog(frame, main);
+            true
+        }
         cmd_id::RULES_EDIT => {
             run_rules_dialog(frame, main);
             true
@@ -600,6 +604,35 @@ fn apply_session(frame: &mut MainFrame, st: crate::core::SessionState) {
 /// runas 单步）。新实例加载当前 exe 同目录的状态文件（原版 start2.qdr 同位）。
 /// 高亮/着色规则编辑：模态对话框（rules_dialog），确定后写回
 /// `Config.rules` 并持久化到实际 ini 路径，再重灌四窗格刷新行色。
+/// 设置对话框（选项→设置…）：tree_*/tab_*/文件操作键。确定后写回
+/// Config、持久化 ini，并即时应用可即时生效的样式（树样式位/缩进、
+/// 标签 TCS_TOOLTIPS）。其余键（width_mode/hover_time/file_ops.*）
+/// 先持久化，渲染端消费*待后续项*。
+fn run_settings_dialog(frame: &mut MainFrame, main: HWND) {
+    let Some(st) =
+        (unsafe { crate::ui_native::settings_dialog::open_settings(main, &frame.config) })
+    else {
+        println!("[qdir-rs] TEST 设置：取消");
+        return;
+    };
+    crate::ui_native::settings_dialog::apply_state(&mut frame.config, &st);
+    match crate::config::save_config(&frame.ini_path, &frame.config) {
+        Ok(()) => println!("[qdir-rs] TEST 设置已保存 -> {:?}", frame.ini_path),
+        Err(e) => eprintln!("[qdir-rs] 设置保存失败：{e}"),
+    }
+    // 即时生效：树样式位 + 缩进；标签 TCS_TOOLTIPS。
+    unsafe { frame.apply_tree_settings() };
+    println!(
+        "[qdir-rs] TEST 设置应用 树[无钮={} 单支={} 整行={} 缩进{}] 标签[中键关={} 提示={}]",
+        st.tree_noexpando,
+        st.tree_single_expand,
+        st.tree_fullrow,
+        st.tree_indent,
+        st.tab_close_mbt,
+        st.tab_tooltips
+    );
+}
+
 fn run_rules_dialog(frame: &mut MainFrame, main: HWND) {
     let Some(new_rules) =
         (unsafe { crate::ui_native::rules_dialog::edit_rules(main, &frame.config.rules) })

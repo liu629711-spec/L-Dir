@@ -8,6 +8,7 @@ pub mod commands;
 pub mod mainframe;
 pub mod menu;
 pub mod rules_dialog;
+pub mod settings_dialog;
 pub mod splitter;
 pub mod subclass;
 pub mod toolbar;

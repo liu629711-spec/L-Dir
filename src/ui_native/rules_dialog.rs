@@ -184,12 +184,12 @@ pub struct ItemDef<'a> {
     pub cy: i16,
 }
 
-const ATOM_BUTTON: u16 = 0x0080;
-const ATOM_EDIT: u16 = 0x0081;
-const ATOM_STATIC: u16 = 0x0082;
+pub(crate) const ATOM_BUTTON: u16 = 0x0080;
+pub(crate) const ATOM_EDIT: u16 = 0x0081;
+pub(crate) const ATOM_STATIC: u16 = 0x0082;
 
 impl<'a> ItemDef<'a> {
-    fn button(text: &'a str, id: i32, x: i16, y: i16, cx: i16, style_extra: u32) -> Self {
+    pub(crate) fn button(text: &'a str, id: i32, x: i16, y: i16, cx: i16, style_extra: u32) -> Self {
         ItemDef {
             id,
             atom: Some(ATOM_BUTTON),
@@ -203,21 +203,21 @@ impl<'a> ItemDef<'a> {
             cy: 14,
         }
     }
-    fn static_(text: &'a str, x: i16, y: i16, cx: i16) -> Self {
+    pub(crate) fn static_(text: &'a str, x: i16, y: i16, cx: i32, style_extra: u32) -> Self {
         ItemDef {
             id: -1,
             atom: Some(ATOM_STATIC),
             class: "",
             text,
-            style: WS_CHILD.0 | WS_VISIBLE.0 | SS_LEFT.0,
+            style: WS_CHILD.0 | WS_VISIBLE.0 | SS_LEFT.0 | style_extra,
             ex: 0,
             x,
             y,
-            cx,
+            cx: cx as i16,
             cy: 8,
         }
     }
-    fn edit(text: &'a str, id: i32, x: i16, y: i16, cx: i16, style_extra: u32) -> Self {
+    pub(crate) fn edit(text: &'a str, id: i32, x: i16, y: i16, cx: i16, style_extra: u32) -> Self {
         ItemDef {
             id,
             atom: Some(ATOM_EDIT),
@@ -262,9 +262,9 @@ pub fn main_items() -> Vec<ItemDef<'static>> {
 pub fn item_items<'a>(pattern: &'a str, color_text: &'a str) -> Vec<ItemDef<'a>> {
     vec![
         ItemDef::button("启用此规则", IDC_EDIT_EN, 10, 12, 120, BS_AUTOCHECKBOX as u32),
-        ItemDef::static_("模式（通配符串，`;` 分隔）", 10, 34, 200),
+        ItemDef::static_("模式（通配符串，`;` 分隔）", 10, 34, 200, 0),
         ItemDef::edit(pattern, IDC_EDIT_PAT, 10, 46, 270, ES_AUTOHSCROLL as u32),
-        ItemDef::static_("前景色（RRGGBB）", 10, 66, 90),
+        ItemDef::static_("前景色（RRGGBB）", 10, 66, 90, 0),
         ItemDef::edit(color_text, IDC_COL_EDIT, 100, 64, 60, ES_AUTOHSCROLL as u32),
         ItemDef::button("选色…", IDC_COL_BTN, 166, 63, 55, 0),
         ItemDef::button("默认", IDC_COL_DEF, 226, 63, 40, 0),

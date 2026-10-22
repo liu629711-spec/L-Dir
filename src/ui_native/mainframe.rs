@@ -742,6 +742,34 @@ impl MainFrame {
         }
     }
 
+    /// 即时应用设置对话框里的树样式位/缩进与标签 TCS_TOOLTIPS 位
+    /// （设置对话框确定后调用；纯位映射见 settings_dialog::tree_styles）。
+    pub unsafe fn apply_tree_settings(&mut self) {
+        let styles = crate::ui_native::settings_dialog::tree_styles(&self.config.tree);
+        for i in 0..4 {
+            if let Some(tv) = self.panes[i].tree {
+                // WS_CHILD|WS_VISIBLE 常位由 create 时已设；这里只翻样式位。
+                let keep = WS_CHILD.0 | WS_VISIBLE.0 | WS_CLIPSIBLINGS.0 | WS_BORDER.0;
+                let _ = SetWindowLongPtrW(
+                    tv,
+                    GWL_STYLE,
+                    (keep | styles) as isize,
+                );
+                // 缩进：TVM_SETINDENT（像素→WORD）。
+                let ind = self.config.tree.indent_width.min(200) as usize;
+                let _ = SendMessageW(tv, TVM_SETINDENT, Some(WPARAM(ind)), None);
+            }
+            if let Some(tab) = self.panes[i].tab {
+                let mut st = GetWindowLongPtrW(tab, GWL_STYLE) as u32;
+                st &= !TCS_TOOLTIPS;
+                st |= crate::ui_native::settings_dialog::tab_tooltips_bit(
+                    self.config.tab.show_tooltips,
+                );
+                let _ = SetWindowLongPtrW(tab, GWL_STYLE, st as isize);
+            }
+        }
+    }
+
     /// 统一刷新全局状态栏 5 段：0=活动窗格计数(+选中数)、1=版本、
     /// 2=用户名(x64)、3=盘符标签、4=空闲/总容量。分段边界随客户区宽伸缩。
     pub unsafe fn refresh_status(&mut self) {

@@ -186,8 +186,7 @@ P1 必须（产品可用性），按行为表证据实现；P2 体验完整；P3
   「行数=12 规则数=12 控件 list..cancel 全 true」+ 提交链「TEST 规则已保存
   12 条 -> "Q-Dir.ini"」、对话框关闭无残留（#32770 枚举确认）。
 
-- 剩余 P2：状态栏 5 段信息完善、设置对话框（tree_*/tab_* keys）。（高亮/
-着色规则编辑、标签行为开关、打印、查找、颜色主题档位已完成，见上。）
+- 剩余 P2：无——已全部完成（见上 ✅）。
 
 - ✅ 状态栏 5 段完善（2026-10-22）：原实现只有 4 段（SB_SETPARTS 数组少
   传 -1 拉伸项）且边界固定、段0 口径不一（合计 vs 活动窗格）。现在
@@ -204,6 +203,30 @@ P1 必须（产品可用性），按行为表证据实现；P2 体验完整；P3
   对象」→选中「146 个对象，已选 1」；SetWindowPos 1600→边界
   [348,506,823,1235,-1]、900→[194,282,459,689,-1] 伸缩正确；纯函数单测
   1 个（单调/比例/钳底/5 项含 -1）。
+
+- ✅ 设置对话框（2026-10-22）：选项菜单「设置(&S)…」30210 →
+  `ui_native::settings_dialog`（同规则框手法：自建 DLGTEMPLATE +
+  DialogBoxIndirectParamW，R1 零原版字节）。三组 15 项：目录树
+  （无钮/单支展开/整行选择/根连线/禁线/缩进/悬停）、标签页
+  （中键关/双击关/悬停提示/最大宽/宽模式单选）、文件操作
+  （移动确认/刷新保选择/向上选上次）。核心全纯函数：
+  `state_from_config`/`apply_state` 双向映射（幂等单测）、
+  `tree_styles` 开关位→TVS_* 位映射（HASBUTTONS/HASLINES/
+  LINESATROOT/SINGLEEXPAND/FULLROWSELECT，常开位
+  SHOWSELALWAYS|CHECKBOXES|DISABLEDRAGDROP，单测）、
+  `tab_tooltips_bit`、`parse_u32`（越界回落，单测）、
+  模板 id 无重复单测。确定后：写回 Config → save_config →
+  `apply_tree_settings` **即时生效**（四树 GWL_STYLE 样式位 +
+  TVM_SETINDENT；标签 TCS_TOOLTIPS GWL_STYLE）；tab 中键/双击
+  开关本就实时读 config（subclass），零重建。width_mode/
+  hover_time/file_ops.* 持久化后渲染端消费*待后续项*。
+  **顺带确证**：apply_config_to_doc 的 ensure_modeled_keys
+  「缺键且值≠默认才补写」路径首次端到端验证（此前原文件缺
+  tree_* 键时静默丢用户修改的隐患已由其覆盖，新增单测
+  ensure_modeled_keys_skips_defaults_and_appends_changes）。
+  实测（QDIR_TEST_SETTINGS[=flip]）：控件齐=true+11 项初态读回；
+  flip 提交→Q-Dir.ini 补写 tree_no_expando=1/tree_indent_width=30
+  →重启→对话框「树钮=true 缩进=30」读回（完整往返链）。
 **P3** Shell 扩展菜单宿主、Everything/MS-Search 集成、多语言 UI（自有文案表）、
 便携/安装版差异、托盘行为、开机恢复、拖放精修
 
