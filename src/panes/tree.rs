@@ -182,9 +182,9 @@ impl TreeModel {
         self.selected.as_deref()
     }
 
-    /// 目录树是否启用（`tree_mode` 或窗格级 `TreeN`）。
+    /// 目录树是否启用（`tree_mode` 非关，或窗格级 `TreeN` 由 GUI 层叠加）。
     pub fn enabled(&self) -> bool {
-        self.cfg.mode
+        self.cfg.mode.is_active()
     }
 
     /// 把树根重挂到 `new_root`。

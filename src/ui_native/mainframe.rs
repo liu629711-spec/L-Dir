@@ -14,7 +14,8 @@ use windows::Win32::Foundation::*;
 use windows::Win32::Graphics::Gdi::*;
 use windows::Win32::UI::Input::KeyboardAndMouse::SetFocus;
 use windows::Win32::Storage::FileSystem::{
-    GetDiskFreeSpaceExW, GetDriveTypeW, GetLogicalDriveStringsW, GetVolumeInformationW,
+    FILE_ATTRIBUTE_DIRECTORY, GetDiskFreeSpaceExW, GetDriveTypeW, GetLogicalDriveStringsW,
+    GetVolumeInformationW,
 };
 use windows::Win32::UI::Controls::*;
 use windows::Win32::UI::WindowsAndMessaging::*;
@@ -24,6 +25,8 @@ use crate::core::{ColumnDef, Config, FileItem, PaneId, PaneState, SessionState, 
 use crate::shell::{EnumOptions, FileItemExt, IconCache, IconSize, list_directory_detailed};
 use crate::ui::pane::format_filetime;
 use crate::ui_native::splitter::{SPLITTER_WIDTH, SplitterGroup};
+use crate::ui_native::tree::{self, TreeNodes};
+use crate::core::TreeMode;
 
 /// LVS_REPORT(0x0001) | LVS_SHOWSELALWAYS(0x0008)
 const LVS_REPORT_SHOWSEL: u32 = 0x0001 | 0x0008;
@@ -43,6 +46,8 @@ const CID_TAB: i32 = 5;
 const CID_LIST: i32 = 6;
 const CID_COMBO_DRIVES: i32 = 7;
 const CID_STATUS: i32 = 8;
+/// 窗格目录树（SysTreeView32）。
+const CID_TREE: i32 = 9;
 
 // ---- 全局子控件 ID ----
 const CID_REBAR: i32 = 90;
@@ -65,6 +70,9 @@ const CMD_BUTTONS: &[&str] = &[
 /// 原版详情视图 4 列（UIA dump：名称/修改日期/类型/大小）。
 const COLUMN_TITLES: &[&str] = &["名称", "修改日期", "类型", "大小"];
 const COLUMN_WIDTHS: &[i32] = &[200, 150, 120, 90];
+
+/// 树交互探针只跑一次。
+static TREE_PROBE_DONE: std::sync::atomic::AtomicBool = std::sync::atomic::AtomicBool::new(false);
 
 /// 窗格容器类名（自有；原 ATL 私有类名属原版资产，不再复用——R1）。
 const PANE_CLASS: PCWSTR = w!("LDir.Pane");
@@ -121,6 +129,7 @@ unsafe fn ensure_pane_class(hinstance: HINSTANCE) {
 enum Src {
     List,
     Tab,
+    Tree,
 }
 
 /// Rgb(R,G,B) → Win32 COLORREF（0x00BBGGRR）。
@@ -208,6 +217,10 @@ struct PaneWindows {
     tab: Option<HWND>,
     status: Option<HWND>,
     list: Option<HWND>,
+    /// 窗格目录树（SysTreeView32，tree_mode 非 0 时可见；附录 A.3）。
+    tree: Option<HWND>,
+    /// 树节点登记（HTREEITEM→路径）+ 回环抑制标志（busy）。
+    tree_nodes: TreeNodes,
     drive_combo: Option<HWND>,
     /// 列表行号 → 完整路径（populate 时写入；命令分发按选中行取路径）。
     row_paths: Vec<std::path::PathBuf>,
@@ -239,6 +252,8 @@ pub struct MainFrame {
     pub ui_scale: u32,
     /// 窗格是否已灌过数据（避免重复枚举）。
     panes_filled: [bool; 4],
+    /// 系统小图标 ImageList 里的文件夹图标索引（首建树时解析一次）。
+    folder_image: i32,
 }
 
 impl MainFrame {
@@ -255,6 +270,7 @@ impl MainFrame {
             ui_font: HFONT::default(),
             ui_scale: 100,
             panes_filled: [false; 4],
+            folder_image: -1,
         }
     }
 
@@ -457,6 +473,7 @@ impl MainFrame {
                     SET_WINDOW_POS_FLAGS(SWP_NOZORDER.0 | SWP_NOACTIVATE.0),
                 );
             }
+            layout_pane_children(frame, i, *r);
         }
         LRESULT(0)
     }
@@ -820,6 +837,23 @@ impl MainFrame {
                         .collect();
                     println!("[qdir-rs] TEST 窗格{} 着色行 {} 条：{hits:?}", index + 1, hits.len());
                 }
+                // 树联动：首次需要时懒建（on_size 可能晚于首轮 WM_CREATE 填充），
+                // 再把树选中项定位到当前目录（tree_auto_expand_from_list）。
+                if self.session.tree_mode.is_active() && self.panes[index].tree_nodes.path_of.is_empty() {
+                    self.build_tree(index);
+                }
+                self.tree_sync_to_path(index);
+                // 验证钩子：QDIR_TEST_TREE_SELECT=1 → 展开首个盘根并选中其第一个
+                // 子目录，走完整 TVN_SELCHANGED→navigate 链（同进程安全）。
+                if std::env::var("QDIR_TEST_TREE_SELECT").is_ok()
+                    && index == 0
+                    && TREE_PROBE_DONE
+                        .compare_exchange(false, true, std::sync::atomic::Ordering::SeqCst, std::sync::atomic::Ordering::SeqCst)
+                        .is_ok()
+                {
+                    // 一次性触发：探针自身会 navigate_to → fill_pane，防止无限递归。
+                    self.tree_probe_select(index);
+                }
                 self.panes_filled[index] = true;
                 unsafe { self.paint_sort_glyphs(index) };
                 // 验证钩子：QDIR_TEST_SELECT_ROW 设置时选中该行（外部命令测试用，同进程安全）。
@@ -832,6 +866,124 @@ impl MainFrame {
             Err(e) => eprintln!("[qdir-rs] 枚举 {path:?} 失败：{e}"),
         }
     }
+    /// 设置树模式（附录 A.3 确证 0/1/2）并重排所有窗格。
+    /// 0→非 0 时把四个窗格的 `tree_visible` 置真（viewtree 按钮观感：树全开）；
+    /// 非 0→0 保留窗格位（回到原状态保存值无意义，保持当前勾选，下次开机恢复）。
+    pub unsafe fn set_tree_mode(&mut self, main: HWND, mode: TreeMode) {
+        if mode.is_active() {
+            let any = self.session.panes.iter().any(|p| p.tree_visible);
+            if !any {
+                for i in 0..4 {
+                    self.session.panes[i].tree_visible = true;
+                }
+            }
+        }
+        self.session.tree_mode = mode;
+        if mode.is_active() {
+            for i in 0..4 {
+                self.build_tree(i);
+            }
+        }
+        // 重排（SWP_FRAMECHANGED 不产 WM_SIZE，显式补发——与 set_layout 同法）。
+        let _ = SetWindowPos(
+            main,
+            None,
+            0,
+            0,
+            0,
+            0,
+            SET_WINDOW_POS_FLAGS(
+                SWP_NOMOVE.0 | SWP_NOSIZE.0 | SWP_NOZORDER.0 | SWP_FRAMECHANGED.0,
+            ),
+        );
+        SendMessageW(main, WM_SIZE, Some(WPARAM(SIZE_RESTORED as usize)), None);
+        println!("[qdir-rs] TEST tree_mode={}", mode.to_u32());
+    }
+
+    /// 首次需要时建树：盘符根并列 + 文件夹图标 + 当前目录复选框勾选态。
+    pub fn build_tree(&mut self, index: usize) {
+        let Some(tv) = self.panes[index].tree else { return };
+        if !self.panes[index].tree_nodes.path_of.is_empty() {
+            return; // 已建过：保留展开态
+        }
+        if self.folder_image < 0 {
+            self.folder_image = unsafe { folder_icon_index() };
+        }
+        let img = self.folder_image;
+        unsafe {
+            // 清空再灌盘符根。
+            let _ = SendMessageW(tv, TVM_DELETEITEM, Some(WPARAM(0)), Some(LPARAM(0)));
+            self.panes[index].tree_nodes.clear();
+            for d in tree::drive_roots() {
+                tree::insert_dir_node(tv, tree::tvi_root(), &d, img, &mut self.panes[index].tree_nodes);
+            }
+            // TreeN 位 → 根行复选框（勾选=image 2）。
+            if self.session.panes[index].tree_visible {
+                let mut root = tree::tree_next(tv, TVGN_ROOT, HTREEITEM(0));
+                while root.0 != 0 {
+                    tree::set_state_image(tv, root, 2);
+                    root = tree::tree_next(tv, TVGN_NEXT, root);
+                }
+            }
+        }
+    }
+
+    /// 列表导航后把树定位到当前目录（`tree_auto_expand_from_list` 语义，busy 抑制回环）。
+    pub fn tree_sync_to_path(&mut self, index: usize) {
+        let Some(tv) = self.panes[index].tree else { return };
+        if !self.session.tree_mode.is_active() {
+            return;
+        }
+        let path = self.pane_path(index);
+        if path.as_os_str().is_empty() {
+            return;
+        }
+        if self.folder_image < 0 {
+            self.folder_image = unsafe { folder_icon_index() };
+        }
+        let img = self.folder_image;
+        self.panes[index].tree_nodes.busy = true;
+        let found = unsafe { tree::reveal(tv, &path, &mut self.panes[index].tree_nodes, img) };
+        self.panes[index].tree_nodes.busy = false;
+        if !found {
+            // 盘符不可达（网络盘掉线等）：只留痕不报错。
+            println!("[qdir-rs] TEST 树定位失败 {path:?}");
+        }
+    }
+
+    /// 钩子：展开树首个盘根、选中第一个子目录（验证 懒加载→选中→导航 闭环）。
+    fn tree_probe_select(&mut self, index: usize) {
+        let Some(tv) = self.panes[index].tree else { return };
+        let img = self.folder_image;
+        let root = unsafe { tree::tree_next(tv, TVGN_ROOT, tree::tvi_root()) };
+        if root.0 == 0 {
+            println!("[qdir-rs] TEST 树探针：无盘根");
+            return;
+        }
+        unsafe { tree::set_expand(tv, root, true) };
+        if !self.panes[index].tree_nodes.is_loaded(root) {
+            let Some(rdir) = self.panes[index].tree_nodes.path(root).map(|x| x.to_path_buf()) else {
+                return;
+            };
+            unsafe { tree::load_child_dirs(tv, root, &rdir, img, &mut self.panes[index].tree_nodes) };
+        }
+        let child = unsafe { tree::tree_next(tv, TVGN_CHILD, root) };
+        if child.0 == 0 {
+            println!("[qdir-rs] TEST 树探针：盘根无子目录");
+            return;
+        }
+        // busy 抑制 TVN_SELCHANGEDW 回环（fill_pane 里会再次 sync），
+        // 然后显式走与通知处理器完全相同的导航链，验证 懒加载→选中→导航 闭环。
+        let Some(p) = self.panes[index].tree_nodes.path(child).map(|x| x.to_path_buf()) else {
+            return;
+        };
+        self.panes[index].tree_nodes.busy = true;
+        unsafe { tree::select_node(tv, child) };
+        self.panes[index].tree_nodes.busy = false;
+        unsafe { self.navigate_to(index, p.clone()) };
+        println!("[qdir-rs] TEST 树探针选中导航 -> {p:?}");
+    }
+
     /// 通知路由：子控件（list/tab）→ 主窗处理。
     unsafe fn on_notify(&mut self, main: HWND, lp: LPARAM) -> LRESULT {
         if lp.0 == 0 {
@@ -865,6 +1017,53 @@ impl MainFrame {
                     SendMessageW(hdr.hwndFrom, TCM_GETCURSEL, None, None).0.max(0) as usize
                 };
                 self.tab_select(pidx, pos);
+                LRESULT(0)
+            }
+            c if role == Src::Tree && c == tree::TVN_ITEMEXPANDEDW => {
+                // 懒加载：首次展开枚举直接子目录（附录 A.3 树的形态）。
+                let Some(tv) = self.panes[pidx].tree else { return LRESULT(0) };
+                let nm = unsafe { &*(lp.0 as *const NMTREEVIEWW) };
+                let h = nm.itemNew.hItem;
+                let expanding = nm.action == tree::TVE_EXPAND;
+                let img = self.folder_image;
+                let pending = if expanding && !self.panes[pidx].tree_nodes.is_loaded(h) {
+                    self.panes[pidx].tree_nodes.path(h).map(|x| x.to_path_buf())
+                } else {
+                    None
+                };
+                if let Some(dir) = pending {
+                    tree::load_child_dirs(tv, h, &dir, img, &mut self.panes[pidx].tree_nodes);
+                }
+                LRESULT(0)
+            }
+            c if role == Src::Tree && c == tree::TVN_SELCHANGEDW => {
+                if self.panes[pidx].tree_nodes.busy {
+                    return LRESULT(0);
+                }
+                let Some(tv) = self.panes[pidx].tree else { return LRESULT(0) };
+                let h = tree::tree_next(tv, TVGN_CARET, HTREEITEM(0));
+                let Some(dir) = self.panes[pidx].tree_nodes.path(h).map(|x| x.to_path_buf()) else {
+                    return LRESULT(0);
+                };
+                if dir.is_dir() {
+                    self.navigate_to(pidx, dir);
+                }
+                LRESULT(0)
+            }
+            c if role == Src::Tree && c == tree::TVN_ITEMSTATEICONCLICKW => {
+                // 树根复选框 = 窗格级 TreeN 位（自主解释：勾选=本窗格跟随子目录，
+                // *行为待复核*）；此处记录状态并把所有盘根勾选态同步。
+                let bit = !self.session.panes[pidx].tree_visible;
+                self.session.panes[pidx].tree_visible = bit;
+                if let Some(tv) = self.panes[pidx].tree {
+                    let img = if bit { 2u32 } else { 1u32 };
+                    let mut root = unsafe { tree::tree_next(tv, TVGN_ROOT, HTREEITEM(0)) };
+                    while root.0 != 0 {
+                        unsafe { tree::set_state_image(tv, root, img) };
+                        root = unsafe { tree::tree_next(tv, TVGN_NEXT, root) };
+                    }
+                }
+                println!("[qdir-rs] TEST 树窗格{} TreeN 位={}", pidx + 1, bit as u32);
                 LRESULT(0)
             }
             _ => LRESULT(0),
@@ -921,6 +1120,9 @@ impl MainFrame {
             }
             if p.tab == Some(hwnd) {
                 return Some((i, Src::Tab));
+            }
+            if p.tree == Some(hwnd) {
+                return Some((i, Src::Tree));
             }
         }
         None
@@ -1369,6 +1571,27 @@ unsafe fn create_pane(frame: &mut MainFrame, parent: HWND, hinstance: HINSTANCE,
         base + CID_LIST,
     )
     .ok();
+    // 窗格目录树（tree_mode 非 0 时由 layout_pane_children 定位显示）。
+    frame.panes[index].tree = create_child(
+        content,
+        hinstance,
+        WC_TREEVIEW,
+        w!(""),
+        WINDOW_STYLE(
+            WS_VISIBLE.0 | WS_CHILD.0 | WS_CLIPSIBLINGS.0
+                | (TVS_HASLINES | TVS_LINESATROOT | TVS_HASBUTTONS | TVS_SHOWSELALWAYS | TVS_CHECKBOXES),
+        ),
+        base + CID_TREE,
+    )
+    .ok();
+    if let Some(tv) = frame.panes[index].tree {
+        // 图像列表：系统小图标（TVSIL_NORMAL）+ 状态复选框（TVSIL_STATE 由 comctl 内建）。
+        if let Some(hilm) = unsafe { system_small_imagelist() } {
+            unsafe {
+                SendMessageW(tv, TVM_SETIMAGELIST, Some(WPARAM(TVSIL_NORMAL as usize)), Some(LPARAM(hilm.0)));
+            }
+        }
+    }
     if let Some(lv) = frame.panes[index].list {
         // LVS_EX_FULLROWSELECT(0x20) + LVS_EX_DOUBLEBUFFER(0x10000)。
         unsafe {
@@ -1605,6 +1828,186 @@ unsafe fn populate_pane_chrome(frame: &mut MainFrame, index: usize, path: &std::
             set_status_text(sb, 4, &free);
         }
     }
+}
+
+// ---------- 窗格内部布局 ----------
+
+/// 地址栏/工具条/按钮排/过滤行的固定行高（像素；缩放档只重设字体，
+/// 行高对齐原版 chrome 近似值，*精确高度待截图级对照*）。
+const ROW_ADDR: i32 = 22;
+const ROW_TOOLBAR: i32 = 26;
+const ROW_TAB: i32 = 24;
+const ROW_BUTTON: i32 = 24;
+const ROW_FILTER: i32 = 24;
+
+/// 窗格内部几何：addr → 工具条排 → content（tab/按钮排/过滤行/树|列表）→ 状态栏。
+/// 树按 tree_mode 几何（附录 A.3：1=双列左栏，2=覆盖浮层）；窗格 `TreeN` 位
+/// 关闭时该窗格不显示树（panes::tree_visible 同规则）。
+fn layout_pane_children(frame: &mut MainFrame, index: usize, r: (i32, i32, i32, i32)) {
+    let (x, y, w, h) = r;
+    if w < 40 || h < 60 {
+        return;
+    }
+    // 懒建：tree_mode 开且尚未登记任何节点（.qdr 恢复 / 首次开启）→ 建盘根并定位。
+    if frame.session.tree_mode.is_active() && frame.panes[index].tree_nodes.path_of.is_empty() {
+        frame.build_tree(index);
+        frame.tree_sync_to_path(index);
+    }
+    let p = &frame.panes[index];
+    let status_h = unsafe { statusbar_height(p.status) }.max(18);
+    let swp = SET_WINDOW_POS_FLAGS(SWP_NOZORDER.0 | SWP_NOACTIVATE.0);
+    // container 子窗：坐标 = 容器原点 + 相对偏移。
+    let put = |hwnd: Option<HWND>, cx: i32, cy: i32, cw: i32, ch: i32| {
+        if let Some(hq) = hwnd {
+            let _ = unsafe { SetWindowPos(hq, None, x + cx, y + cy, cw.max(1), ch.max(1), swp) };
+        }
+    };
+    // content 子窗：坐标 = content 原点（相对 content 客户区）。
+    let put_c = |hwnd: Option<HWND>, cx: i32, cy: i32, cw: i32, ch: i32| {
+        if let Some(hq) = hwnd {
+            let _ = unsafe { SetWindowPos(hq, None, cx, cy, cw.max(1), ch.max(1), swp) };
+        }
+    };
+
+    // 1. 地址栏（整行）。
+    put(p.addr_edit, 0, 0, w, ROW_ADDR);
+    // 2. 工具条排 x3 + 计数 + 驱动器下拉。
+    let tb_w = 60;
+    put(p.toolbars[0], 0, ROW_ADDR, tb_w, ROW_TOOLBAR);
+    put(p.toolbars[1], tb_w + 2, ROW_ADDR, tb_w, ROW_TOOLBAR);
+    put(p.toolbars[2], 2 * (tb_w + 2), ROW_ADDR, tb_w, ROW_TOOLBAR);
+    put(p.drive_combo, w - 150, ROW_ADDR, 150, ROW_TOOLBAR);
+    put(p.count_text, 3 * (tb_w + 2), ROW_ADDR, (w - 150 - 3 * (tb_w + 2)).max(1), ROW_TOOLBAR);
+
+    // 3. content：工具条排下、状态栏上。
+    let content_top = ROW_ADDR + ROW_TOOLBAR;
+    let content_h = (h - content_top - status_h).max(40);
+    put(p.content, 0, content_top, w, content_h);
+    // content 内部坐标从 0 起；cy0 保留给容器坐标（按钮排绝对 y 用）。
+    let (cx0, cy0, cw, _) = (0, content_top, w, content_h);
+    let ccy0 = 0i32;
+
+    // 3.1 页签。
+    put_c(p.tab, 0, ccy0, cw, ROW_TAB);
+    // 3.2 命令按钮排：两行五列。
+    let n = p.cmd_buttons.len() as i32;
+    let cols = ((n + 1) / 2).max(1);
+    let bw = cw / cols;
+    for (bi, b) in p.cmd_buttons.iter().enumerate() {
+        let col = (bi as i32) % cols;
+        let row = (bi as i32) / cols;
+        let _ = unsafe {
+            SetWindowPos(*b, None, col * bw, ccy0 + ROW_TAB + row * ROW_BUTTON, (bw - 2).max(1), ROW_BUTTON - 2, swp)
+        };
+    }
+    // 按钮占用的高度 = 行数（向上取整），不是列数。
+    let rows = (n + cols - 1) / cols;
+    let buttons_h = rows * ROW_BUTTON;
+    // 3.3 过滤行：obj_split | filter_edit | open。
+    let filt_y = ROW_TAB + buttons_h;
+    put_c(p.obj_split, 0, ccy0 + filt_y, 96, ROW_FILTER);
+    put_c(p.open_btn, cw - 52, ccy0 + filt_y, 52, ROW_FILTER);
+    put_c(p.filter_edit, 100, ccy0 + filt_y, (cw - 100 - 56).max(20), ROW_FILTER);
+    let body_y = filt_y + ROW_FILTER;
+    let body_h = (content_h - body_y).max(40);
+
+    // 3.4 树 | 列表：显隐由全局 tree_mode 决定（附录 A.3）；窗格 TreeN 位
+    // 只反映在树根复选框上（自主解释，*跟随子目录行为待复核*）。
+    let mode = frame.session.tree_mode.to_u32();
+    let geom = tree::tree_layout_for(mode);
+    // body 矩形用 content 客户坐标（相对 content）。
+    let body = (cx0, ccy0 + body_y, cw, body_h);
+    let (tree_rect, list_rect) = match geom {
+        None => (None, body),
+        Some(false) => {
+            // 双列：内容区 body 切分。
+            match tree::tree_column_rect(body, frame.session.panes[index].tree_split) {
+                Some((tr, lr)) => (Some(tr), lr),
+                None => (None, body),
+            }
+        }
+        Some(true) => (Some(tree::tree_overlay_rect(body)), body),
+    };
+
+    // 列表容器 + 列表占满 list_host 客户区。
+    put_c(p.list_host, list_rect.0, list_rect.1, list_rect.2, list_rect.3);
+    if let Some(lq) = p.list {
+        let _ = unsafe { SetWindowPos(lq, None, 0, 0, list_rect.2.max(1), list_rect.3.max(1), swp) };
+    }
+
+    // 树显隐与几何。
+    if let Some(tv) = p.tree {
+        match tree_rect {
+            Some((tx, ty, tw, th)) => {
+                unsafe {
+                    let _ = ShowWindow(tv, SW_SHOWNA);
+                    // 覆盖模式需要树压在列表上（HWND_TOP）。
+                    if geom == Some(true) {
+                        let _ = SetWindowPos(
+                            tv,
+                            Some(HWND_TOP),
+                            tx,
+                            ty,
+                            tw.max(1),
+                            th.max(1),
+                            SET_WINDOW_POS_FLAGS(SWP_NOACTIVATE.0),
+                        );
+                    } else {
+                        let _ = SetWindowPos(tv, None, tx, ty, tw.max(1), th.max(1), swp);
+                    }
+                }
+            }
+            None => {
+                let _ = unsafe { ShowWindow(tv, SW_HIDE) };
+            }
+        }
+    }
+    // 窗格状态栏（container 子窗）。
+    put(p.status, 0, h - status_h, w, status_h);
+}
+
+// ---------- 系统图标列表 ----------
+
+/// 进程级缓存：小图标系统 ImageList 句柄 + 文件夹图标索引。
+static SYS_IL: std::sync::OnceLock<(isize, i32)> = std::sync::OnceLock::new();
+
+/// `SHGetFileInfoW(SHGFI_SYSICONINDEX)` 返回系统小图标 ImageList 句柄；
+/// 以 `.` + FILE_ATTRIBUTE_DIRECTORY + USEFILEATTRIBUTES 查询拿文件夹图标索引。
+fn sys_small_imagelist() -> Option<(isize, i32)> {
+    let pair = *SYS_IL.get_or_init(|| unsafe {
+        let mut fi = windows::Win32::UI::Shell::SHFILEINFOW::default();
+        let dot: Vec<u16> = ".".encode_utf16().chain(std::iter::once(0)).collect();
+        let use_shgfi = windows::Win32::UI::Shell::SHGFI_SMALLICON
+            | windows::Win32::UI::Shell::SHGFI_SYSICONINDEX
+            | windows::Win32::UI::Shell::SHGFI_USEFILEATTRIBUTES;
+        let r = windows::Win32::UI::Shell::SHGetFileInfoW(
+            windows::core::PCWSTR::from_raw(dot.as_ptr()),
+            FILE_ATTRIBUTE_DIRECTORY,
+            Some(&mut fi),
+            core::mem::size_of::<windows::Win32::UI::Shell::SHFILEINFOW>() as u32,
+            use_shgfi,
+        );
+        if r == 0 {
+            (0, -1)
+        } else {
+            (r as isize, fi.iIcon)
+        }
+    });
+    if pair.0 != 0 {
+        Some(pair)
+    } else {
+        None
+    }
+}
+
+/// 取（或缓存）系统小图标列表句柄。
+unsafe fn system_small_imagelist() -> Option<HIMAGELIST> {
+    sys_small_imagelist().map(|(h, _)| HIMAGELIST(h))
+}
+
+/// 文件夹图标在系统小图标列表中的索引；失败返回 -1。
+unsafe fn folder_icon_index() -> i32 {
+    sys_small_imagelist().map(|(_, i)| i).unwrap_or(-1)
 }
 
 // ---------- 小工具 ----------

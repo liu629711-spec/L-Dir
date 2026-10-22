@@ -211,7 +211,7 @@ pub(crate) fn tree_view(
     id: PaneId,
     events: &mut Vec<PaneEvent>,
 ) {
-    if !c.view_tree().config().mode {
+    if !c.view_tree().config().mode.is_active() {
         return;
     }
     ScrollArea::vertical().show(ui, |ui| {

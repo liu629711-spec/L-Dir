@@ -19,7 +19,7 @@ fn main() {
                 let mut buf = vec![0u16; (title_len + 1) as usize];
                 unsafe { GetWindowTextW(hwnd, &mut buf) };
                 let t = String::from_utf16_lossy(&buf[..title_len as usize]);
-                if t == "Q-Dir" {
+                if t == qdir_rs::brand::PRODUCT_NAME || t == "L-Dir" {
                     unsafe { PostMessageW(Some(hwnd), WM_COMMAND, WPARAM(cmd as usize), LPARAM(0)) };
                     println!("[send] WM_COMMAND {cmd} -> {hwnd:?}");
                     return BOOL(0);

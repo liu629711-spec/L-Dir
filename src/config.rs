@@ -23,8 +23,8 @@ use std::fs;
 use std::path::{Path, PathBuf};
 
 use crate::core::{
-    ColumnConfig, Config, Lang, PaneId, PaneState, SessionState, SplitPermille, ViewMode, QError,
-    QResult,
+    ColumnConfig, Config, Lang, PaneId, PaneState, SessionState, SplitPermille, TreeMode, ViewMode,
+    QError, QResult,
 };
 
 // ============ 原始键名集中区（B2） ============
@@ -629,7 +629,7 @@ pub fn load_config_bytes(bytes: &[u8]) -> QResult<Config> {
         t.auto_sel = get_bool(&doc, INI_SECTIONS::START, KEYS::TREE_AUTO_SEL, t.auto_sel)?;
         t.hover_time =
             get_u32(&doc, INI_SECTIONS::START, KEYS::TREE_HOVER_TIME, t.hover_time)?;
-        t.mode = get_bool(&doc, INI_SECTIONS::START, KEYS::TREE_MODE, t.mode)?;
+        t.mode = TreeMode::from_u32(get_u32(&doc, INI_SECTIONS::START, KEYS::TREE_MODE, t.mode.to_u32())?);
     }
 
     // ---- 标签页 ----
@@ -829,7 +829,7 @@ pub fn apply_config_to_doc(doc: &mut IniDocument, cfg: &Config) {
     doc.set_in_place(start, KEYS::TREE_AUTO_EXPAND_FROM_LIST, bool_u8(cfg.tree.auto_expand_from_list).to_string());
     doc.set_in_place(start, KEYS::TREE_AUTO_SEL, bool_u8(cfg.tree.auto_sel).to_string());
     doc.set_in_place(start, KEYS::TREE_HOVER_TIME, cfg.tree.hover_time.to_string());
-    doc.set_in_place(start, KEYS::TREE_MODE, bool_u8(cfg.tree.mode).to_string());
+    doc.set_in_place(start, KEYS::TREE_MODE, cfg.tree.mode.to_u32().to_string());
 
     doc.set_in_place(start, KEYS::TAB_NEW_TAB_L_DBLCLK, bool_u8(cfg.tab.new_tab_l_dblclk).to_string());
     doc.set_in_place(start, KEYS::TAB_NEW_TAB_L_CLK, bool_u8(cfg.tab.new_tab_l_clk).to_string());
@@ -921,7 +921,7 @@ fn ensure_modeled_keys(doc: &mut IniDocument, cfg: &Config) {
         pairs.push((KEYS::TREE_HOVER_TIME, cfg.tree.hover_time.to_string()));
     }
     if cfg.tree.mode != d.tree.mode {
-        pairs.push((KEYS::TREE_MODE, bool_u8(cfg.tree.mode).to_string()));
+        pairs.push((KEYS::TREE_MODE, cfg.tree.mode.to_u32().to_string()));
     }
     if cfg.tab.new_tab_l_dblclk != d.tab.new_tab_l_dblclk {
         pairs.push((KEYS::TAB_NEW_TAB_L_DBLCLK, bool_u8(cfg.tab.new_tab_l_dblclk).to_string()));
@@ -1127,7 +1127,7 @@ pub fn load_session_bytes(bytes: &[u8]) -> QResult<SessionState> {
 
     st.version = get_string(&doc, "", QDR_KEYS::VERSION, &st.version);
     st.view_mode = get_u32(&doc, "", QDR_KEYS::VIEW_MODE, st.view_mode)?;
-    st.tree_mode = get_bool(&doc, "", QDR_KEYS::TREE_MODE, st.tree_mode)?;
+    st.tree_mode = TreeMode::from_u32(get_u32(&doc, "", QDR_KEYS::TREE_MODE, st.tree_mode.to_u32())?);
     st.preview_visible = get_bool(&doc, "", QDR_KEYS::VORSCHAU, st.preview_visible)?;
     st.preview_pos = SplitPermille::from_qdr_ten_thousandths(get_u32(
         &doc,
@@ -1225,7 +1225,7 @@ pub fn apply_session_to_doc(doc: &mut IniDocument, st: &SessionState) {
         doc.set_in_place("", key, want.to_qdr_ten_thousandths().to_string());
     }
     doc.set_in_place("", QDR_KEYS::SPT, st.split_preview.to_qdr_ten_thousandths().to_string());
-    doc.set_in_place("", QDR_KEYS::TREE_MODE, bool_u8(st.tree_mode).to_string());
+    doc.set_in_place("", QDR_KEYS::TREE_MODE, st.tree_mode.to_u32().to_string());
     doc.set_in_place("", QDR_KEYS::VORSCHAU, bool_u8(st.preview_visible).to_string());
     doc.set_in_place("", QDR_KEYS::VORSCHAU_POS, st.preview_pos.to_qdr_ten_thousandths().to_string());
     doc.set_in_place("", QDR_KEYS::FOCUS, st.focus.number().to_string());
@@ -1513,7 +1513,7 @@ mod tests {
         assert_eq!(st.preview_pos, SplitPermille(750));
         assert_eq!(st.focus, PaneId::P1);
         assert_eq!(st.pane(PaneId::P1).tree_split, 250);
-        assert!(!st.tree_mode);
+        assert_eq!(st.tree_mode, TreeMode::Off);
     }
 
     #[test]

@@ -28,6 +28,11 @@ pub mod cmd_id {
     pub const VIEW_FIT_COL: u32 = 30027;
     pub const VIEW_REFRESH: u32 = 30028;
     pub const VIEW_TREE_TOGGLE: u32 = 30029;
+    // 树模式三档 + 循环（附录 A.3：原 54001/54002/54003/54006 系）。
+    pub const VIEW_TREE_SPLIT: u32 = 30030; // tree_mode=1 双列
+    pub const VIEW_TREE_OVERLAY: u32 = 30031; // tree_mode=2 覆盖
+    pub const VIEW_TREE_OFF: u32 = 30032; // tree_mode=0 关
+    pub const VIEW_TREE_CYCLE: u32 = 30033; // +1 循环
     // 缩放（60/80/100/110/120/130/140/150/160/180/200）
     pub const ZOOM_BASE: u32 = 30040;
     // 配色（5 档）
@@ -89,6 +94,10 @@ pub fn build_main_menu() -> windows::core::Result<HMENU> {
     add(v, "列宽自适应（含列头）(&W)", cmd_id::VIEW_FIT_COL_HEADER);
     add(v, "列宽自适应(&H)", cmd_id::VIEW_FIT_COL);
     add(v, "目录树显隐(&T)", cmd_id::VIEW_TREE_TOGGLE);
+    add(v, "树：双列(&1)", cmd_id::VIEW_TREE_SPLIT);
+    add(v, "树：覆盖(&2)", cmd_id::VIEW_TREE_OVERLAY);
+    add(v, "树：关闭(&0)", cmd_id::VIEW_TREE_OFF);
+    add(v, "树：模式循环", cmd_id::VIEW_TREE_CYCLE);
     let z = popup(v, "缩放(&Z)");
     for (i, pct) in cmd_id::ZOOM_STEPS.iter().enumerate() {
         add(z, &format!("{}%(&{})", pct, (b'A' + i as u8) as char), cmd_id::ZOOM_BASE + i as u32);

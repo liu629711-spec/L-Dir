@@ -998,6 +998,52 @@ fn default_pane_path() -> PathBuf {
     }
 }
 
+/// 目录树显示模式（原版 `tree_mode` 键，取值 0/1/2 由 `FUN_0046dc10` 反编译确证，
+/// 见 NATIVE_SPEC 附录 A.3）：关 / 双列（树与列表并排）/ 覆盖（树浮在列表上方）。
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub enum TreeMode {
+    #[default]
+    Off,
+    Split,
+    Overlay,
+}
+
+impl TreeMode {
+    pub fn to_u32(self) -> u32 {
+        match self {
+            TreeMode::Off => 0,
+            TreeMode::Split => 1,
+            TreeMode::Overlay => 2,
+        }
+    }
+
+    pub fn from_u32(v: u32) -> Self {
+        match v {
+            1 => TreeMode::Split,
+            2 => TreeMode::Overlay,
+            _ => TreeMode::Off,
+        }
+    }
+
+    pub fn is_active(self) -> bool {
+        !matches!(self, TreeMode::Off)
+    }
+
+    /// viewtree 按钮（0xA773）确证语义：开↔关切换（原 0x806c/0x806b）。
+    pub fn toggled(self) -> Self {
+        if self.is_active() { TreeMode::Off } else { TreeMode::Split }
+    }
+
+    /// 54006 系菜单确证语义：+1 循环（原 0x806a）。
+    pub fn cycled(self) -> Self {
+        match self {
+            TreeMode::Off => TreeMode::Split,
+            TreeMode::Split => TreeMode::Overlay,
+            TreeMode::Overlay => TreeMode::Off,
+        }
+    }
+}
+
 /// 整个窗口/会话的可序列化状态，对应 start.qdr。
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct SessionState {
@@ -1011,8 +1057,8 @@ pub struct SessionState {
     pub splits_h: [SplitPermille; 3],
     /// 预览面板分割位置（SPT），千分比。
     pub split_preview: SplitPermille,
-    /// 目录树全局开关（tree_mode）。
-    pub tree_mode: bool,
+    /// 目录树显示模式（原版 `tree_mode` 键，FUN_0046dc10 确证 0/1/2）。
+    pub tree_mode: TreeMode,
     /// 预览面板是否显示（Vorschau）。
     pub preview_visible: bool,
     /// 预览面板分割位置（VorschauPos=7500 万分数）。
@@ -1045,7 +1091,7 @@ impl Default for SessionState {
                 SplitPermille(500),
             ],
             split_preview: SplitPermille(200),
-            tree_mode: false,
+            tree_mode: TreeMode::default(),
             preview_visible: false,
             preview_pos: SplitPermille(750),
             focus: PaneId::P1,
@@ -1092,7 +1138,7 @@ pub struct TreeConfig {
     pub auto_expand_from_list: bool, // tree_auto_expand_from_list
     pub auto_sel: bool,            // tree_auto_sel
     pub hover_time: u32,           // tree_hover_time（毫秒）
-    pub mode: bool,                // tree_mode
+    pub mode: TreeMode,            // tree_mode
 }
 
 impl Default for TreeConfig {
@@ -1112,7 +1158,7 @@ impl Default for TreeConfig {
             auto_expand_from_list: false,
             auto_sel: false,
             hover_time: 500,
-            mode: false,
+            mode: TreeMode::default(),
         }
     }
 }
@@ -1587,6 +1633,19 @@ mod tests {
     }
 
     #[test]
+    fn tree_mode_roundtrip_and_switches() {
+        assert_eq!(TreeMode::from_u32(0), TreeMode::Off);
+        assert_eq!(TreeMode::from_u32(1), TreeMode::Split);
+        assert_eq!(TreeMode::from_u32(2), TreeMode::Overlay);
+        assert_eq!(TreeMode::from_u32(7), TreeMode::Off, "野值=关");
+        assert_eq!(TreeMode::Overlay.to_u32(), 2);
+        // 按钮确证语义（附录 A.3）：toggled 开↔关；cycled +1 回绕。
+        assert_eq!(TreeMode::Off.toggled(), TreeMode::Split);
+        assert_eq!(TreeMode::Overlay.toggled(), TreeMode::Off);
+        assert_eq!(TreeMode::Overlay.cycled(), TreeMode::Off);
+    }
+
+    #[test]
     fn pane_state_tree_split_default() {
         let pane = PaneState::new(PaneId::P1, PathBuf::from("C:\\a"));
         assert_eq!(pane.tree_split, 250, "Tree1split=2500 万分数 -> 250 千分比");
@@ -1639,7 +1698,7 @@ mod tests {
         assert_eq!(s.splits_h, [SplitPermille(500), SplitPermille(500), SplitPermille(500)]);
         assert_eq!(s.split_preview, SplitPermille(200));
         assert_eq!(s.preview_pos, SplitPermille(750));
-        assert!(!s.tree_mode);
+        assert_eq!(s.tree_mode, TreeMode::Off);
         assert!(!s.preview_visible);
         assert_eq!(s.colorthema, 0);
         assert_eq!(s.panes.len(), 4);

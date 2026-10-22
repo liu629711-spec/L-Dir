@@ -10,6 +10,7 @@ pub mod menu;
 pub mod splitter;
 pub mod subclass;
 pub mod toolbar;
+pub mod tree;
 
 pub use app::App;
 pub use mainframe::MainFrame;

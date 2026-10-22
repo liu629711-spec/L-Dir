@@ -175,7 +175,7 @@ fn qdr_byte_identical_roundtrip_on_real_file() {
         st.focus
     );
     assert_eq!(st.colorthema, 0);
-    assert!(!st.tree_mode);
+    assert_eq!(st.tree_mode, qdir_rs::core::TreeMode::Off, "实测 start.qdr tree_mode=0");
     assert!(!st.preview_visible);
     assert_eq!(st.splits_h[0].value(), 500, "SP0=5000 万分数 -> 500 千分比");
     assert_eq!(st.splits_h[1].value(), 500, "SP1=5003 取整后同为 500");

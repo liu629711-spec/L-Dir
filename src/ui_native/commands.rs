@@ -13,6 +13,7 @@ use windows::Win32::UI::Controls::Dialogs::{GetOpenFileNameW, GetSaveFileNameW, 
 use windows::Win32::UI::WindowsAndMessaging::*;
 
 use crate::brand;
+use crate::core::TreeMode;
 use crate::shell;
 use crate::ui_native::mainframe::MainFrame;
 use crate::ui_native::menu::cmd_id;
@@ -186,12 +187,25 @@ pub unsafe fn dispatch(frame: &mut MainFrame, main: HWND, id: u32) -> bool {
             let _ = shell::open_default(host, &fav_dir);
             true
         }
+        cmd_id::VIEW_TREE_SPLIT => {
+            frame.set_tree_mode(main, TreeMode::Split);
+            true
+        }
+        cmd_id::VIEW_TREE_OVERLAY => {
+            frame.set_tree_mode(main, TreeMode::Overlay);
+            true
+        }
+        cmd_id::VIEW_TREE_OFF => {
+            frame.set_tree_mode(main, TreeMode::Off);
+            true
+        }
+        cmd_id::VIEW_TREE_CYCLE => {
+            frame.set_tree_mode(main, frame.session.tree_mode.cycled());
+            true
+        }
         cmd_id::VIEW_TREE_TOGGLE => {
-            // 树显隐（附录 A.3 确证 tree_mode 0/1/2；UI 在 P1 补树控件，
-            // 先落实会话状态位）。
-            let next = if frame.session.tree_mode { 0 } else { 1 };
-            frame.session.tree_mode = next != 0;
-            println!("[qdir-rs] TEST tree_mode={next}");
+            // 树显隐（附录 A.3 确证：开关切换 0<->1，原 0x806c/0x806b）。
+            frame.set_tree_mode(main, frame.session.tree_mode.toggled());
             true
         }
         // —— 导航工具栏按钮（附录 A.4 确证语义：z6/v6=布局索引循环、
@@ -235,11 +249,8 @@ pub unsafe fn dispatch(frame: &mut MainFrame, main: HWND, id: u32) -> bool {
             true
         }
         layout::VIEWTREE => {
-            frame.session.tree_mode = !frame.session.tree_mode;
-            println!(
-                "[qdir-rs] TEST 工具栏树切换 tree_mode={}",
-                frame.session.tree_mode as u32
-            );
+            // viewtree 按钮 = 树开/关切换（附录 A.3 确证 0x806c/0x806b，非布局按钮）。
+            frame.set_tree_mode(main, frame.session.tree_mode.toggled());
             true
         }
                 id if (cmd_id::VIEW_ICON..=cmd_id::VIEW_DETAILS).contains(&id) => {

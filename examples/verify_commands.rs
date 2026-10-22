@@ -16,7 +16,7 @@ unsafe extern "system" fn find_top(hwnd: HWND, _l: LPARAM) -> BOOL {
         let mut buf = [0u16; 64];
         let n = unsafe { GetWindowTextW(hwnd, &mut buf) };
         let t = String::from_utf16_lossy(&buf[..n as usize]);
-        if t == "Q-Dir" {
+        if t == qdir_rs::brand::PRODUCT_NAME || t == "L-Dir" {
             unsafe { (*std::ptr::addr_of_mut!(MAIN)) = Some(hwnd) };
             return BOOL(0);
         }

@@ -513,7 +513,7 @@ impl<'a> PaneController<'a> {
 
     /// 目录树是否显示。`tree_mode`（全局）关时一律不显示。
     pub fn tree_visible(&self) -> bool {
-        self.state.tree_visible && self.view.tree.config().mode
+        self.state.tree_visible && self.view.tree.config().mode.is_active()
     }
 
     /// 用 ini 的 `tree_*` 配置刷新树行为。
@@ -1046,7 +1046,7 @@ mod tests {
         p.tree_visible = true;
         assert!(!ctrl(&mut p, &mut v).tree_visible(), "tree_mode 仍关");
         v.tree.set_config(TreeConfig {
-            mode: true,
+            mode: crate::core::TreeMode::Split,
             ..TreeConfig::default()
         });
         assert!(ctrl(&mut p, &mut v).tree_visible(), "两个开关都开才显示");
@@ -1090,7 +1090,7 @@ mod tests {
         let mut p = pane(PaneId::P1, r"C:\root");
         let mut v = view(r"C:\root");
         v.tree.set_config(TreeConfig {
-            mode: true,
+            mode: crate::core::TreeMode::Split,
             auto_expand_from_list: true,
             auto_sel: true,
             ..TreeConfig::default()
@@ -1186,7 +1186,7 @@ mod tests {
             views.get(PaneId::P1).tree.root_path(),
             Path::new(&session.pane(PaneId::P1).path())
         );
-        assert!(!views.get(PaneId::P1).tree.config().mode);
+        assert!(!views.get(PaneId::P1).tree.config().mode.is_active());
     }
 
     #[test]
@@ -1224,14 +1224,14 @@ mod tests {
         apply_tree_config(
             &mut views,
             &TreeConfig {
-                mode: true,
+                mode: crate::core::TreeMode::Split,
                 indent_width: 24,
                 ..TreeConfig::default()
             },
         );
         for id in PaneId::ALL {
             let c = views.get(id).tree.config();
-            assert!(c.mode);
+            assert!(c.mode.is_active());
             assert_eq!(c.indent_width, 24);
         }
     }

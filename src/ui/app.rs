@@ -283,14 +283,22 @@ impl QDirApp {
                     }
                 }
                 ui.separator();
-                if ui
-                    .checkbox(&mut self.session.tree_mode, "显示目录树")
-                    .clicked()
-                {
+                let mut tree_on = self.session.tree_mode.is_active();
+                if ui.checkbox(&mut tree_on, "显示目录树").clicked() {
+                    // 复选框 = 开关；勾选恢复上次模式（默认双列），取消 = 关。
+                    self.session.tree_mode = if tree_on {
+                        if self.session.tree_mode == crate::core::TreeMode::Off {
+                            crate::core::TreeMode::Split
+                        } else {
+                            self.session.tree_mode
+                        }
+                    } else {
+                        crate::core::TreeMode::Off
+                    };
                     // 同步四个窗格的树可见性。
                     for i in 1..=4u32 {
                         if let Some(pid) = PaneId::from_number(i) {
-                            self.session.pane_mut(pid).tree_visible = self.session.tree_mode;
+                            self.session.pane_mut(pid).tree_visible = tree_on;
                         }
                     }
                     self.dirty = true;

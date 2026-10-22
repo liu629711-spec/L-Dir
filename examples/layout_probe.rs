@@ -31,7 +31,7 @@ unsafe extern "system" fn enum_proc(hwnd: HWND, lparam: LPARAM) -> windows::core
             let t = windows::Win32::UI::WindowsAndMessaging::GetWindowTextW(hwnd, &mut title);
             if t > 0 {
                 let title_s = String::from_utf16_lossy(&title[..t as usize]);
-                if title_s == "Q-Dir" || title_s.starts_with("Q-Dir ") {
+                if title_s == "L-Dir" || title_s.starts_with("Q-Dir ") {
                     let ctx = &mut *(lparam.0 as *mut Ctx);
                     ctx.found = Some(hwnd);
                     return false.into();

@@ -72,7 +72,25 @@ P1 必须（产品可用性），按行为表证据实现；P2 体验完整；P3
    冒烟实测：循环 3 步 2×2→单格→2×2→左右、tree_mode=1、30099→四格(4 列)，
    窗口存活。剩余：视图菜单 52001–52012 显隐表（附录 A.4 已解 8/12，
    k=4/6/8 链式穿透段）属原版内部布局序，我们的 Layout::ALL 序即自定序。
-3. 视图：窗格级 0x7029–0x702c（大图标/小图标/列表/详情，槽位确证）；
+3. ✅ 树控件（2026-10-22）：`ui_native/tree.rs` SysTreeView32 接入——tree_mode
+   三态（0 关 / 1 双列 / 2 覆盖，附录 A.3 `FUN_0046dc10` 确证；`core::TreeMode`
+   取代旧 bool，.qdr/ini 读写兼容 tree_mode=0/1/2）；盘符根并列 + 懒加载
+   子目录（TVE_EXPAND 首次展开枚举）+ 根行复选框（TreeN 位，*跟随子目录
+   行为待复核*）；列表导航→树自动展开祖先链并选中（reveal，tree_auto_
+   expand_from_list 语义），树选中→列表导航（TVN_SELCHANGED→navigate_to，
+   busy 抑制回环）。viewtree 按钮=开关切换（toggled），视图菜单新增
+   双列/覆盖/关闭/循环四档（原 54001/54002/54003/54006 系）。
+   **顺带补上窗格内部布局 pass**（layout_pane_children：addr/工具条排/
+   页签/命令按钮两行五列/过滤行/树|列双列或覆盖切分/状态栏——此前子控件
+   从未被定位，全挤在 (0,0,10,10)；树几何暴露了这个空档）。
+   实测：30030→4 树可见（双列 60×61px 于 800×600 窗，宽=250‰ 树分割），
+   30031→覆盖（175×53 浮层），30033 循环/30029 开关全绿；
+   QDIR_TEST_TREE_SELECT 钩子端到端：展开 C:\ → 懒加载子目录 →
+   选中 C:\$RECYCLE.BIN → 窗格导航成功；启动 .qdr tree_mode=1 时
+   reveal 定位当前目录 0 失败。树图标=系统小图标列表（SHGetFileInfoW
+   SHGFI_SYSICONINDEX 缓存句柄，TVM_SETIMAGELIST）。
+   263 lib + 11 集成全绿。
+4. 视图：窗格级 0x7029–0x702c（大图标/小图标/列表/详情，槽位确证）；
    列宽自适应 33938/33939（已有）；网格线 32864（已有）
 4. 状态：打开 .qdr（GetOpenFileName→FUN_0046cc14 语义）、保存当前状态
    （GetSaveFileName→FUN_0045cf90）、重复窗口（新建实例加载 start2.qdr）、
