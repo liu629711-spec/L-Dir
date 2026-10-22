@@ -188,6 +188,22 @@ P1 必须（产品可用性），按行为表证据实现；P2 体验完整；P3
 
 - 剩余 P2：状态栏 5 段信息完善、设置对话框（tree_*/tab_* keys）。（高亮/
 着色规则编辑、标签行为开关、打印、查找、颜色主题档位已完成，见上。）
+
+- ✅ 状态栏 5 段完善（2026-10-22）：原实现只有 4 段（SB_SETPARTS 数组少
+  传 -1 拉伸项）且边界固定、段0 口径不一（合计 vs 活动窗格）。现在
+  `status_parts(width)` 纯函数按客户区宽算 5 段边界
+  （22/32/52/78%+[-1]，钳底 240），`refresh_status` 统一现算 5 段文本：
+  0=活动窗格对象数（选中时追加「已选 N」，LVM_GETSELECTEDCOUNT 实查）、
+  1=版本、2=用户名(x64)、3=盘符标签（GetVolumeInformationW）、
+  4=空闲/总容量（GetDiskFreeSpaceExW）。接线点：on_create/on_size/
+  set_active_pane/NM_CLICK 焦点切换/LVN_ITEMCHANGED/fill_pane(chrome)。
+  删除占位的 object_count_text 与 chrome 内重复写段。诚实声明：原版 UIA
+  确证「5 段文本」存在，但**各段内容与宽度比例未反编译确证** *待复核*——
+  段内容取同类文件管理器惯例（计数/版本/用户/盘符/空间）。实测：
+  QDIR_TEST_STATUS 钩子 + QDIR_TEST_SELECT_ROW=1 端到端：启动「146 个
+  对象」→选中「146 个对象，已选 1」；SetWindowPos 1600→边界
+  [348,506,823,1235,-1]、900→[194,282,459,689,-1] 伸缩正确；纯函数单测
+  1 个（单调/比例/钳底/5 项含 -1）。
 **P3** Shell 扩展菜单宿主、Everything/MS-Search 集成、多语言 UI（自有文案表）、
 便携/安装版差异、托盘行为、开机恢复、拖放精修
 

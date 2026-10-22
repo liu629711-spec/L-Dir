@@ -261,6 +261,8 @@ struct PaneWindows {
 pub struct MainFrame {
     pub config: Config,
     pub session: SessionState,
+    /// 主窗口句柄（on_create 设置；状态栏刷新取宽用）。
+    pub main: HWND,
     /// 配置文件的实际加载路径（规则编辑确定后写回此处）。
     pub ini_path: std::path::PathBuf,
     /// 四窗格子窗口。
@@ -299,6 +301,7 @@ impl MainFrame {
         MainFrame {
             config,
             session,
+            main: HWND::default(),
             ini_path,
             panes: Default::default(),
             splitters: SplitterGroup::horizontal(4),
@@ -365,6 +368,7 @@ impl MainFrame {
 
         let frame = Box::leak(Box::new(MainFrame::new(config, session, hinstance, ini_path)));
         frame.menu = hmenu;
+        frame.main = hwnd;
         SetWindowLongPtrW(hwnd, GWLP_USERDATA, frame as *mut _ as isize);
         unsafe { crate::ui_native::subclass::set_main_hwnd(hwnd) };
 
@@ -391,20 +395,9 @@ impl MainFrame {
             WS_VISIBLE | WS_CHILD | WINDOW_STYLE(SBARS_SIZEGRIP),
             CID_MAIN_STATUS,
         ).ok();
-        if let Some(sb) = frame.status {
-            // 边界用 -1 伸缩（UIA 显示 5 段文本）。
-            let parts: [i32; 4] = [140, 260, 420, 560];
-            unsafe {
-                SendMessageW(
-                    sb,
-                    SB_SETPARTS,
-                    Some(WPARAM(parts.len())),
-                    Some(LPARAM(parts.as_ptr() as isize)),
-                )
-            };
-            set_status_text(sb, 0, &object_count_text(&frame));
-            set_status_text(sb, 1, brand::PRODUCT_VERSION);
-            set_status_text(sb, 2, &format!("{} (x64)", std::env::var("USERNAME").unwrap_or_default()));
+        if frame.status.is_some() {
+            // 原版 UIA 确证「5 段文本」；边界按窗宽伸缩、内容按会话现算。
+            unsafe { frame.refresh_status() };
         }
 
         // 3. 四个窗格：容器 + 状态栏 + 内容控件。
@@ -560,6 +553,8 @@ impl MainFrame {
                 0, height - status_h, width, status_h,
                 SET_WINDOW_POS_FLAGS(SWP_NOZORDER.0 | SWP_NOACTIVATE.0),
             );
+            // 分段边界随宽度伸缩（refresh_status 统一重算+重设文本）。
+            frame.refresh_status();
         }
 
         // 窗格区：ReBar 之下、状态栏之上。
@@ -740,9 +735,64 @@ impl MainFrame {
         match PaneId::from_number(index as u32 + 1) {
             Some(id) => {
                 self.session.focus = id;
+                unsafe { self.refresh_status() };
                 true
             }
             None => false,
+        }
+    }
+
+    /// 统一刷新全局状态栏 5 段：0=活动窗格计数(+选中数)、1=版本、
+    /// 2=用户名(x64)、3=盘符标签、4=空闲/总容量。分段边界随客户区宽伸缩。
+    pub unsafe fn refresh_status(&mut self) {
+        let Some(sb) = self.status else { return };
+        let mut rc = RECT::default();
+        let mut width = 800i32;
+        if GetClientRect(self.main, &mut rc).is_ok() {
+            width = (rc.right - rc.left).max(240);
+        }
+        let parts = status_parts(width);
+        let _ = SendMessageW(
+            sb,
+            SB_SETPARTS,
+            Some(WPARAM(parts.len())),
+            Some(LPARAM(parts.as_ptr() as isize)),
+        );
+        // 段 0：活动窗格当前目录对象数 + 选中数（计数来自最近一次填充）。
+        let focus = (self.session.focus.number() - 1) as usize;
+        let count = self.panes.get(focus).map(|p| p.row_paths.len()).unwrap_or(0);
+        let sel = self
+            .panes
+            .get(focus)
+            .and_then(|p| p.list)
+            .map(|l| unsafe { SendMessageW(l, LVM_GETSELECTEDCOUNT, None, None).0.max(0) as usize })
+            .unwrap_or(0);
+        let text0 = if sel > 0 {
+            format!("{count} 个对象，已选 {sel}")
+        } else {
+            format!("{count} 个对象")
+        };
+        let (label, free) = match self.pane_path(focus) {
+            p if !p.as_os_str().is_empty() => match drive_summary(&p) {
+                Some((l, f)) => (l, f),
+                None => (p.to_string_lossy().into_owned(), String::new()),
+            },
+            _ => (String::new(), String::new()),
+        };
+        let segs = [
+            text0,
+            brand::PRODUCT_VERSION.to_string(),
+            format!("{} (x64)", std::env::var("USERNAME").unwrap_or_default()),
+            label,
+            free,
+        ];
+        for (i, t) in segs.iter().enumerate() {
+            set_status_text(sb, i as i32, t);
+        }
+        // 验证钩子：QDIR_TEST_STATUS 打印 5 段文本与边界
+        // （SB_GETTEXT 跨进程读指针失效，进程内自证）。
+        if std::env::var("QDIR_TEST_STATUS").is_ok() {
+            println!("[qdir-rs] TEST 状态栏 边界={parts:?} 文本={segs:?}");
         }
     }
 
@@ -1375,17 +1425,26 @@ impl MainFrame {
             }
             c if c == NM_CLICK && role == Src::List => {
                 // 原版：点击窗格即激活它。
-                if let Some(id) = PaneId::from_number(pidx as u32 + 1) {
+                let changed = if let Some(id) = PaneId::from_number(pidx as u32 + 1) {
                     if self.session.focus != id {
                         self.session.focus = id;
+                        true
+                    } else {
+                        false
                     }
+                } else {
+                    false
+                };
+                if changed {
+                    unsafe { self.refresh_status() };
                 }
                 self.update_preview_pane(pidx);
                 LRESULT(0)
             }
             c if c == LVN_ITEMCHANGED && role == Src::List => {
-                // 选中变化（键盘/程序选择也走这里）：预览跟随。
+                // 选中变化（键盘/程序选择也走这里）：预览跟随 + 状态栏选中数。
                 self.update_preview_pane(pidx);
+                unsafe { self.refresh_status() };
                 LRESULT(0)
             }
             c if c == TCN_SELCHANGE && role == Src::Tab => {
@@ -2281,15 +2340,9 @@ unsafe fn populate_pane_chrome(frame: &mut MainFrame, index: usize, path: &std::
     if let Some(sb) = p.status {
         set_status_text(sb, 0, &format!("{count} 个对象"));
     }
-    // 全局状态栏第 0 段 = 活动窗格对象数（原版行为）。
-    if let Some(sb) = frame.status {
-        set_status_text(sb, 0, &format!("{count} 个对象"));
-        // 第 3/4 段：当前盘符与剩余空间。
-        if let Some((label, free)) = drive_summary(path) {
-            set_status_text(sb, 3, &label);
-            set_status_text(sb, 4, &free);
-        }
-    }
+    // 全局状态栏：统一走 refresh_status（计数/选中/盘符/空间一体现算）。
+    // row_paths 在本函数调用点之前已写入，这里读到的是新值。
+    unsafe { frame.refresh_status() };
 }
 
 // ---------- 窗格内部布局 ----------
@@ -2574,16 +2627,13 @@ unsafe fn set_status_text(sb: HWND, part: i32, text: &str) {
     }
 }
 
-/// 全局状态栏第 0 段：所有窗格对象数合计（原版语义：活动窗格计数，先用合计占位）。
-fn object_count_text(frame: &MainFrame) -> String {
-    let mut n = 0usize;
-    for pane in &frame.session.panes {
-        if let Some(t) = pane.tabs.get(pane.tabs_pos) {
-            let _ = t;
-            n += 0; // 未枚举时未知，首枚举后由 populate_pane_chrome 更新
-        }
-    }
-    format!("{n} 个对象")
+/// 状态栏 5 段的分段边界数组（SB_SETPARTS 语义：元素数=段数，最后一项
+/// -1=拉伸到底），随客户区宽缩放：段0 计数(22%)、段1 版本(10%)、
+/// 段2 用户(20%)、段3 盘符(26%)、段4 空间(剩余)。纯函数便于单测；
+/// 比例按原版 UIA 段宽比例近似（5 段确证，具体宽度*待复核*）。
+pub fn status_parts(width: i32) -> [i32; 5] {
+    let w = width.max(240);
+    [w * 22 / 100, w * 32 / 100, w * 52 / 100, w * 78 / 100, -1]
 }
 
 /// 路径所在驱动器的「本地磁盘 (D:)」与「空闲: X GB 在 Y TB」。
@@ -2707,7 +2757,7 @@ Rust + 原生 Win32",
 
 #[cfg(test)]
 mod interaction_tests {
-    use super::{column_sort_click, dir_of_selection};
+    use super::{column_sort_click, dir_of_selection, status_parts};
     use std::path::{Path, PathBuf};
 
     #[test]
@@ -2772,5 +2822,23 @@ mod interaction_tests {
     fn no_selection_does_not_navigate() {
         let cur = Path::new(r"C:\Users\me");
         assert_eq!(dir_of_selection(None, cur), None);
+    }
+
+    #[test]
+    fn status_parts_monotonic_and_clamped() {
+        let p = status_parts(800);
+        // 单调递增、比例近似、末段由 -1 拉伸（不在数组里）。
+        assert!(p[0] < p[1] && p[1] < p[2] && p[2] < p[3]);
+        assert_eq!(p[0], 176);
+        assert_eq!(p[1], 256);
+        assert_eq!(p[2], 416);
+        assert_eq!(p[3], 624);
+        assert_eq!(p.len(), 5);
+        assert_eq!(p[4], -1, "末段拉伸");
+        // 极窄窗口钳到 240 基线，边界仍在窗内。
+        let q = status_parts(10);
+        assert!(q[3] <= 240);
+        let r = status_parts(4000);
+        assert_eq!(r[3], 3120);
     }
 }
