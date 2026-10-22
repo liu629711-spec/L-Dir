@@ -847,6 +847,24 @@ impl PaneState {
     }
 }
 
+/// 标签交互决策（纯函数；TabConfig 行为开关 × 鼠标消息）。
+/// 返回 `Some(true)`=关闭该标签；`Some(false)`=消费事件但不关（防双击穿透
+/// 误激活）；`None`=不处理，放行默认行为。原版分支确证：tab_close_by_mbt_clk
+/// / tab_close_by_lbt_dblclk（配置键存在、默认值已登记；逐键 UI 复核*待办*）。
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum TabMouse {
+    MiddleUp,
+    LeftDblClk,
+}
+
+pub fn tab_click_action(cfg: &TabConfig, msg: TabMouse) -> Option<bool> {
+    match msg {
+        TabMouse::MiddleUp => cfg.close_by_mbt_clk.then_some(true),
+        // 双击关开=关；关时仍吃掉第二次按下后的 dblclk，防标签跳变。
+        TabMouse::LeftDblClk => Some(cfg.close_by_lbt_dblclk),
+    }
+}
+
 // ============ 9. 列配置 ============
 
 /// 详情视图一列。原版 ColsAndSort 是十六进制封装，其中可见
@@ -1641,6 +1659,18 @@ mod tests {
         assert_eq!(pane.view_mode(), ViewMode::LargeIcon);
         pane.current_tab_mut().expect("有标签页").view_mode = Some(ViewMode::Detail);
         assert_eq!(pane.view_mode(), ViewMode::Detail);
+    }
+
+    #[test]
+    fn tab_click_action_respects_switches() {
+        let mut cfg = TabConfig::default();
+        // 默认：中键关、双击不关。
+        assert_eq!(tab_click_action(&cfg, TabMouse::MiddleUp), Some(true));
+        assert_eq!(tab_click_action(&cfg, TabMouse::LeftDblClk), Some(false));
+        cfg.close_by_mbt_clk = false;
+        assert_eq!(tab_click_action(&cfg, TabMouse::MiddleUp), None, "关时放行");
+        cfg.close_by_lbt_dblclk = true;
+        assert_eq!(tab_click_action(&cfg, TabMouse::LeftDblClk), Some(true));
     }
 
     #[test]

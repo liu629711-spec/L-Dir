@@ -1377,6 +1377,15 @@ impl MainFrame {
     }
 
     /// 页签切换：更新 tabs_pos 并重灌窗格（标题跟随）。
+    /// 关闭窗格标签页（中键/双击关闭路径）。core::close_tab 拒绝最后一个
+    /// （原版行为）；成功后重建页签控件并重灌窗格。
+    pub unsafe fn close_tab(&mut self, pidx: usize, tab_idx: usize) -> crate::core::QResult<()> {
+        self.session.panes[pidx].close_tab(tab_idx)?;
+        rebuild_pane_tabs(self, pidx);
+        self.fill_pane(pidx);
+        Ok(())
+    }
+
     unsafe fn tab_select(&mut self, pidx: usize, pos: usize) {
         let pane = &self.session.panes[pidx];
         if pos >= pane.tabs.len() || pos == pane.tabs_pos {
@@ -1651,12 +1660,18 @@ unsafe fn create_pane(frame: &mut MainFrame, parent: HWND, hinstance: HINSTANCE,
     fill_drive_combo(frame.panes[index].drive_combo);
 
     // Tab 页签（原版 d6 SysTabControl32）。
+    let tab_style = WS_VISIBLE | WS_CHILD | WS_CLIPSIBLINGS
+        | WINDOW_STYLE(if frame.config.tab.show_tooltips {
+            TCS_TOOLTIPS
+        } else {
+            0
+        });
     frame.panes[index].tab = create_child(
         content,
         hinstance,
         WC_TABCONTROL,
         w!(""),
-        WS_VISIBLE | WS_CHILD | WS_CLIPSIBLINGS,
+        tab_style,
         base + CID_TAB,
     )
     .ok();
@@ -1719,8 +1734,46 @@ unsafe fn create_pane(frame: &mut MainFrame, parent: HWND, hinstance: HINSTANCE,
         }
         // 键盘导航子类化（Enter 打开/Backspace 返回/地址栏回车）。
         unsafe {
-            crate::ui_native::subclass::install(frame.panes[index].list, frame.panes[index].addr_edit, index)
+            crate::ui_native::subclass::install(
+                frame.panes[index].list,
+                frame.panes[index].addr_edit,
+                frame.panes[index].tab,
+                index,
+            )
         };
+        // 验证钩子：QDIR_TEST_TAB_CLOSE=1 → 窗格1 加第二个标签后向其
+        // 页签控件发 WM_MBUTTONUP（tab 条坐标 (5,5)），走完整
+        // 子类化→TCM_HITTEST→close_tab→重建 链（同进程真实消息）。
+        if index == 0 && std::env::var("QDIR_TEST_TAB_CLOSE").is_ok() {
+            frame.session.panes[0].add_tab(std::path::PathBuf::from(r"C:\Windows"));
+            unsafe { fill_pane_tabs(frame, 0) };
+            if let Some(tab_ctl) = frame.panes[0].tab {
+                let lp_pt: isize = 5i32 as isize | ((5i32 as isize) << 16);
+                unsafe {
+                    let dbl = std::env::var("QDIR_TEST_TAB_CLOSE").map(|v| v == "2").unwrap_or(false);
+                    if dbl {
+                        // =2：左键双击路径（默认开关关=吞事件不关，tabs 应保 2）。
+                        let _ = SendMessageW(
+                            tab_ctl,
+                            WM_LBUTTONDBLCLK,
+                            Some(WPARAM(0x0001)), // MK_LBUTTON
+                            Some(LPARAM(lp_pt)),
+                        );
+                    } else {
+                        let _ = SendMessageW(
+                            tab_ctl,
+                            WM_MBUTTONUP,
+                            Some(WPARAM(0x10usize)), // MK_MBUTTON
+                            Some(LPARAM(lp_pt)),
+                        );
+                    }
+                }
+                println!(
+                    "[qdir-rs] TEST 标签钩子 关后 tabs={}",
+                    frame.session.panes[0].tabs.len()
+                );
+            }
+        }
         // 首次填充（建列头 + 灌行）。
         unsafe { frame.fill_pane(index) };
     }
@@ -1729,6 +1782,8 @@ unsafe fn create_pane(frame: &mut MainFrame, parent: HWND, hinstance: HINSTANCE,
 /// Tab 页签标题 = 窗格各标签页 title（原版 dump：TabItem 数 == tabs 数）。
 unsafe fn fill_pane_tabs(frame: &mut MainFrame, index: usize) {
     let Some(tab_ctl) = frame.panes[index].tab else { return };
+    // 幂等：先清空再灌（钩子/重建都走这里）。
+    let _ = SendMessageW(tab_ctl, TCM_DELETEALLITEMS, None, None);
     let pane = &frame.session.panes[index];
     for (ti, t) in pane.tabs.iter().enumerate() {
         let mut text: Vec<u16> = t.title.encode_utf16().chain(std::iter::once(0)).collect();
@@ -1747,6 +1802,14 @@ unsafe fn fill_pane_tabs(frame: &mut MainFrame, index: usize) {
         }
     }
     let _ = TCIF_TEXT; // keep import
+}
+
+/// 重建页签控件内容（关标签/载入状态后调用）。
+unsafe fn rebuild_pane_tabs(frame: &mut MainFrame, index: usize) {
+    let Some(tab_ctl) = frame.panes[index].tab else { return };
+    fill_pane_tabs(frame, index);
+    let cur = frame.session.panes[index].tabs_pos as usize;
+    let _ = SendMessageW(tab_ctl, TCM_SETCURSEL, Some(WPARAM(cur)), None);
 }
 
 /// 驱动器 ComboBox：枚举本地盘符，文本 = 卷标 (C:)（原版观感）。

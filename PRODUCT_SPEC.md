@@ -123,6 +123,15 @@ P1 必须（产品可用性），按行为表证据实现；P2 体验完整；P3
   与消息泵加速键表 F3（CreateAcceleratorTableW+TranslateAcceleratorW）=
   聚焦活动窗格过滤框，键入即接上面的快速过滤。实测：F3 后 GetGUIThreadInfo
   焦点句柄=窗格1 过滤 Edit（id 1003）。
+- ✅ 标签行为开关（2026-10-22）：`core::tab_click_action` 纯函数决策
+  （TabConfig.close_by_mbt_clk / close_by_lbt_dblclk，原版配置键分支确证；
+  单测）。子类化扩展第三角色 ROLE_TAB（refdata 编码改 `pane<<2|role`）：
+  SysTabControl32 上挂 WM_MBUTTONUP=关标签（TCM_HITTEST 定位→
+  core::close_tab 拒绝最后一个=原版行为→重建页签+重灌）、
+  WM_LBUTTONDBLCLK=开关关时吞事件防标签跳变；show_tooltips=true 建窗时
+  加 TCS_TOOLTIPS（GWL_STYLE 读回确证 0x4000 位）。悬停标题气泡由 comctl
+  内建（页签文本=标签标题）。QDIR_TEST_TAB_CLOSE 钩子双分支实测：
+  =1 中键 2→1 关闭、=2 双击默认开关=吞事件保持 2。
 - ✅ 主题色接 UI（2026-10-22）：`menu::theme_palette` 五档自设计配色
   （R3——原版字面 `#14F3FF (B)/#000000/#14F3FF/#999999/#matrix` 只确证
   档位数量与字面值，渲染语义无字节取证；我们把字面十六进制值落为
