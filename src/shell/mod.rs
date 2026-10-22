@@ -11,6 +11,7 @@
 //! - [`contextmenu`]：IContextMenu 两步式 API（query_context_menu + invoke）；
 //! - [`dragdrop`]：WM_DROPFILES 外部拖入 + OLE 拖放源；
 //! - [`clipboard`]：CF_HDROP / Preferred DropEffect 剪贴板复制/剪切/粘贴；
+//! - [`startup`]：开机恢复（HKCU Run 键登录自启动）；
 //! - [`tray`]：Shell_NotifyIconW 托盘；
 //! - [`special`]：特殊文件夹、虚拟命名空间（此电脑/库）与驱动器枚举。
 //!
@@ -26,6 +27,7 @@ mod enumerate;
 mod fileops;
 mod icons;
 mod special;
+mod startup;
 mod system;
 mod tray;
 
@@ -54,6 +56,7 @@ pub use fileops::{
     print_paths,};
 pub use icons::{IconCache, IconImage, IconSize, icon_image_for_path, stock_icon, system_icon_index_for_path};
 pub use system::{relaunch_as_admin, shell_file_run, shell_shutdown_windows, spawn_terminal};
+pub use startup::{autostart_get, autostart_set, parse_run_command_value, run_command_value};
 pub use special::{
     DriveInfo, DriveKind, ShellLocation, desktop_path, documents_path, drive_root, is_drive_root,
     is_libraries, is_this_pc, libraries_path, list_drives, network_path, parse_shell_path,

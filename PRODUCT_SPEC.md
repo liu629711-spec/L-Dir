@@ -227,6 +227,26 @@ P1 必须（产品可用性），按行为表证据实现；P2 体验完整；P3
   实测（QDIR_TEST_SETTINGS[=flip]）：控件齐=true+11 项初态读回；
   flip 提交→Q-Dir.ini 补写 tree_no_expando=1/tree_indent_width=30
   →重启→对话框「树钮=true 缩进=30」读回（完整往返链）。
+
+- ✅ 开机恢复（P3，2026-10-22）：登录时自动启动 = HKCU
+  `Software\Microsoft\Windows\CurrentVersion\Run` 值 `L-Dir`（带引号 exe
+  路径）。**行为链*待复核***：原版「开机恢复」未反编译确证，按行业惯例自
+  设计；ini `[Start] startup` 键名亦自有（原版 ini 无对应键，已实测确认）。
+  `shell::startup`（契约 D4：advapi32 FFI 全封模块内）：`set_autostart_at`/
+  `get_autostart_at` 子键参数化（生产 RUN_KEY；测试 `Software\L-Dir-tests\<pid>`
+  不碰真 Run 键）+ `run_command_value`/`parse_run_command_value` 引号往返
+  纯函数 + `autostart_set/get` 生产包装。禁用=RegDeleteValueW（缺值幂等）；
+  RegQueryValueExW 缺键/缺值 → Ok(None)。**真实 API 单测**
+  `autostart_roundtrip_on_test_key`：测试键上 缺→设→读回→删→幂等→purge
+  全链；Cargo.toml 加 `Win32_Security` feature（RegCreateKeyExW 门控）。
+  config `startup` 字段 + `startup_key_roundtrip_and_ensure` 单测（改过才
+  补写 / 默认不污染 / 解析往返）；设置对话框「常规与文件操作」组加
+  「开机恢复」复选（IDC_STARTUP）+ DLG_H 增。**双保险调和**：打开对话框
+  前用 `autostart_get` 回灌 config.startup（外部改过 Run 键不显示过期勾选）。
+  端到端（QDIR_TEST_SETTINGS[=flip]）：flip→真实 Run 键写入（`reg query`
+  独立确认 `L-Dir REG_SZ "…qdir-rs.exe"`）→重启→对话框「开机=true」+
+  「Run 值=Some(true)」；删 Run 键后重启→初态「开机=false」回灌确证。
+  冒烟后清理真实键 + ini 复位。285 lib + 11 全绿。
 **P3** Shell 扩展菜单宿主、Everything/MS-Search 集成、多语言 UI（自有文案表）、
 便携/安装版差异、托盘行为、开机恢复、拖放精修
 

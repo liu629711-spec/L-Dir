@@ -41,6 +41,8 @@ const IDC_TAB_MAXW: i32 = 314;
 const IDC_TAB_WMODE_FIXED: i32 = 315;
 const IDC_TAB_WMODE_AUTO: i32 = 316;
 
+const IDC_STARTUP: i32 = 325;
+
 const GRP_OPS: i32 = 320;
 const IDC_OPS_MOVECONF: i32 = 321;
 const IDC_OPS_KEEPSEL: i32 = 322;
@@ -50,7 +52,7 @@ const IDC_OK: i32 = IDOK.0;
 const IDC_CANCEL: i32 = IDCANCEL.0;
 
 pub const DLG_W: i16 = 320;
-pub const DLG_H: i16 = 250;
+pub const DLG_H: i16 = 268;
 
 const RES_CANCEL: isize = 0;
 const RES_OK: isize = 1;
@@ -58,6 +60,8 @@ const RES_OK: isize = 1;
 /// 对话框承载的扁平状态（全部可编辑值；checkbox=u8 0/1）。
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
 pub struct SettingsState {
+    /// 开机恢复（登录时启动；同时是 HKCU Run 值的期望态）。
+    pub startup: bool,
     pub tree_noexpando: bool,
     pub tree_single_expand: bool,
     pub tree_fullrow: bool,
@@ -78,6 +82,7 @@ pub struct SettingsState {
 /// config → 对话框状态（纯函数，单测）。
 pub fn state_from_config(cfg: &Config) -> SettingsState {
     SettingsState {
+        startup: cfg.startup,
         tree_noexpando: cfg.tree.no_expando,
         tree_single_expand: cfg.tree.single_expand,
         tree_fullrow: cfg.tree.fullrowselect,
@@ -98,6 +103,7 @@ pub fn state_from_config(cfg: &Config) -> SettingsState {
 
 /// 对话框状态 → 写回 config（纯函数，单测；只覆盖对应键）。
 pub fn apply_state(cfg: &mut Config, st: &SettingsState) {
+    cfg.startup = st.startup;
     cfg.tree.no_expando = st.tree_noexpando;
     cfg.tree.single_expand = st.tree_single_expand;
     cfg.tree.fullrowselect = st.tree_fullrow;
@@ -214,13 +220,14 @@ pub fn items() -> Vec<ItemDef<'static>> {
     ));
     v.push(ItemDef::button("自适应宽", IDC_TAB_WMODE_AUTO, 200, 130, 70, BS_AUTORADIOBUTTON as u32));
     // —— 文件操作 ——
-    v.push(group("文件操作", 7, 180, 300, 52));
-    v.push(checkbox("移动前确认", IDC_OPS_MOVECONF, 16, 196, 90));
-    v.push(checkbox("刷新保持选择", IDC_OPS_KEEPSEL, 110, 196, 100));
+    v.push(group("常规与文件操作", 7, 180, 300, 70));
+    v.push(checkbox("开机恢复（登录时启动）", IDC_STARTUP, 16, 196, 160));
+    v.push(checkbox("移动前确认", IDC_OPS_MOVECONF, 16, 212, 90));
+    v.push(checkbox("刷新保持选择", IDC_OPS_KEEPSEL, 110, 212, 100));
     v.push(checkbox("向上选中上次项", IDC_OPS_SELECTLAST, 214, 196, 90));
     // —— 确定/取消 ——
-    v.push(ItemDef::button("确定(&O)", IDC_OK, 130, 236, 80, BS_DEFPUSHBUTTON as u32));
-    v.push(ItemDef::button("取消(&C)", IDC_CANCEL, 214, 236, 80, 0));
+    v.push(ItemDef::button("确定(&O)", IDC_OK, 130, 254, 80, BS_DEFPUSHBUTTON as u32));
+    v.push(ItemDef::button("取消(&C)", IDC_CANCEL, 214, 254, 80, 0));
     v
 }
 
@@ -319,6 +326,7 @@ unsafe extern "system" fn proc(hdlg: HWND, msg: u32, wp: WPARAM, lp: LPARAM) -> 
             set_edit(hdlg, IDC_TAB_MAXW, st.tab_max_width);
             set_check(hdlg, IDC_TAB_WMODE_FIXED, st.tab_width_mode == 0);
             set_check(hdlg, IDC_TAB_WMODE_AUTO, st.tab_width_mode == 1);
+            set_check(hdlg, IDC_STARTUP, st.startup);
             set_check(hdlg, IDC_OPS_MOVECONF, st.ops_move_conf);
             set_check(hdlg, IDC_OPS_KEEPSEL, st.ops_keep_sel);
             set_check(hdlg, IDC_OPS_SELECTLAST, st.ops_select_last);
@@ -327,11 +335,12 @@ unsafe extern "system" fn proc(hdlg: HWND, msg: u32, wp: WPARAM, lp: LPARAM) -> 
                 let ctr = |id: i32| GetDlgItem(Some(hdlg), id).is_ok();
                 let ck = |id: i32| get_check(hdlg, id, false);
                 println!(
-                    "[qdir-rs] TEST 设置对话框 控件齐={} 树钮={} 单支={} 整行={} 根线={} 禁线={} 缩进={} 提示={} 中键关={} 双击关={} 移动确认={} 固定宽={}",
+                    "[qdir-rs] TEST 设置对话框 控件齐={} 开机={} 树钮={} 单支={} 整行={} 根线={} 禁线={} 缩进={} 提示={} 中键关={} 双击关={} 移动确认={} 固定宽={}",
                     ctr(IDC_TREE_INDENT)
                         && ctr(IDC_TAB_MAXW)
                         && ctr(IDC_OK)
                         && ctr(IDC_CANCEL),
+                    ck(IDC_STARTUP),
                     ck(IDC_TREE_NOEXPANDO),
                     ck(IDC_TREE_SINGLEEXPAND),
                     ck(IDC_TREE_FULLROW),
@@ -350,6 +359,7 @@ unsafe extern "system" fn proc(hdlg: HWND, msg: u32, wp: WPARAM, lp: LPARAM) -> 
                 if std::env::var("QDIR_TEST_SETTINGS").as_deref() == Ok("flip") {
                     st.tree_noexpando = true;
                     st.tree_indent = 30;
+                    st.startup = true;
                 }
                 OUT_SETTINGS.with(|o| *o.borrow_mut() = Some(st));
                 let _ = EndDialog(hdlg, RES_OK);
@@ -362,6 +372,7 @@ unsafe extern "system" fn proc(hdlg: HWND, msg: u32, wp: WPARAM, lp: LPARAM) -> 
                 IDC_OK => {
                     if let Some(ctx) = ctx_of(hdlg) {
                         let mut st = ctx.st;
+                        st.startup = get_check(hdlg, IDC_STARTUP, st.startup);
                         st.tree_noexpando = get_check(hdlg, IDC_TREE_NOEXPANDO, st.tree_noexpando);
                         st.tree_single_expand =
                             get_check(hdlg, IDC_TREE_SINGLEEXPAND, st.tree_single_expand);

@@ -609,6 +609,12 @@ fn apply_session(frame: &mut MainFrame, st: crate::core::SessionState) {
 /// 标签 TCS_TOOLTIPS）。其余键（width_mode/hover_time/file_ops.*）
 /// 先持久化，渲染端消费*待后续项*。
 fn run_settings_dialog(frame: &mut MainFrame, main: HWND) {
+    // 开机恢复：以注册表实况为准回灌期望态（外部改过 Run 键时不显示过期勾选）。
+    if let Ok(exe) = std::env::current_exe() {
+        if let Ok(live) = unsafe { crate::shell::autostart_get(&exe) } {
+            frame.config.startup = live;
+        }
+    }
     let Some(st) =
         (unsafe { crate::ui_native::settings_dialog::open_settings(main, &frame.config) })
     else {
@@ -619,6 +625,18 @@ fn run_settings_dialog(frame: &mut MainFrame, main: HWND) {
     match crate::config::save_config(&frame.ini_path, &frame.config) {
         Ok(()) => println!("[qdir-rs] TEST 设置已保存 -> {:?}", frame.ini_path),
         Err(e) => eprintln!("[qdir-rs] 设置保存失败：{e}"),
+    }
+    // 开机恢复：把期望态同步到 HKCU Run 键（禁用=删值，幂等）。
+    match std::env::current_exe() {
+        Ok(exe) => match unsafe { crate::shell::autostart_set(st.startup, &exe) } {
+            Ok(()) => println!(
+                "[qdir-rs] TEST 开机恢复={} Run 值={:?}",
+                st.startup,
+                unsafe { crate::shell::autostart_get(&exe) }.ok()
+            ),
+            Err(e) => eprintln!("[qdir-rs] 开机恢复写入失败：{e}"),
+        },
+        Err(e) => eprintln!("[qdir-rs] current_exe 失败，跳过开机恢复：{e}"),
     }
     // 即时生效：树样式位 + 缩进；标签 TCS_TOOLTIPS。
     unsafe { frame.apply_tree_settings() };

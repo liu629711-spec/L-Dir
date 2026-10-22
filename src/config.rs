@@ -58,6 +58,8 @@ mod KEYS {
     pub const DESIGNE_MODE: &str = "designe_mode";
     pub const SHOW_CMD: &str = "showCmd";
     pub const START_CRASH: &str = "StartCrash";
+    /// 开机恢复（自有键名 *待复核*；原版启动行为链未反编译确证）。
+    pub const STARTUP: &str = "startup";
     pub const WIN_RC: &str = "WinRC";
     pub const DEFAULT_TAB: &str = "default_tab";
     pub const CHK_INI: &str = "chk_ini";
@@ -573,6 +575,7 @@ pub fn load_config_bytes(bytes: &[u8]) -> QResult<Config> {
     cfg.show_cmd = get_u32(&doc, INI_SECTIONS::START, KEYS::SHOW_CMD, cfg.show_cmd)?;
     cfg.start_crash =
         get_bool(&doc, INI_SECTIONS::START, KEYS::START_CRASH, cfg.start_crash)?;
+    cfg.startup = get_bool(&doc, INI_SECTIONS::START, KEYS::STARTUP, cfg.startup)?;
     if let Some(raw) = doc.get(INI_SECTIONS::START, KEYS::WIN_RC) {
         cfg.win_rc = parse_win_rc(KEYS::WIN_RC, raw)?;
     }
@@ -739,6 +742,7 @@ pub fn apply_config_to_doc(doc: &mut IniDocument, cfg: &Config) {
     doc.set_in_place(start, KEYS::DESIGNE_MODE, cfg.designe_mode.to_string());
     doc.set_in_place(start, KEYS::SHOW_CMD, cfg.show_cmd.to_string());
     doc.set_in_place(start, KEYS::START_CRASH, bool_u8(cfg.start_crash).to_string());
+    doc.set_in_place(start, KEYS::STARTUP, bool_u8(cfg.startup).to_string());
     doc.set_in_place(
         start,
         KEYS::WIN_RC,
@@ -884,6 +888,9 @@ fn ensure_modeled_keys(doc: &mut IniDocument, cfg: &Config) {
     let start = INI_SECTIONS::START;
     let mut pairs: Vec<(&str, String)> = Vec::new();
     // 只收集「与默认值不同」的键。
+    if cfg.startup != d.startup {
+        pairs.push((KEYS::STARTUP, bool_u8(cfg.startup).to_string()));
+    }
     if cfg.tree.no_expando != d.tree.no_expando {
         pairs.push((KEYS::TREE_NO_EXPANDO, bool_u8(cfg.tree.no_expando).to_string()));
     }
@@ -1602,6 +1609,30 @@ mod tests {
         let back = parse_view_state(&s).expect("可解析");
         assert_eq!(back.view_mode, c.view_mode);
     }
+    #[test]
+    fn startup_key_roundtrip_and_ensure() {
+        // startup 键：解析→写回往返；缺键时只有改过才补写（ensure 路径）。
+        let mut doc = IniDocument::parse("[Start]
+Als=5
+");
+        let mut cfg = Config::default();
+        cfg.startup = true;
+        apply_config_to_doc(&mut doc, &cfg);
+        let sec = doc.section("Start").unwrap();
+        assert_eq!(sec.get("startup"), Some("1"), "改过的 startup 补写");
+        // 从该文档解析回来。
+        let text = doc.to_text();
+        let back = load_config_bytes(&encode_utf16le(&text)).unwrap();
+        assert!(back.startup);
+        // startup=false（默认）不补写。
+        let mut doc2 = IniDocument::parse("[Start]
+Als=5
+");
+        let cfg2 = Config::default();
+        apply_config_to_doc(&mut doc2, &cfg2);
+        assert!(doc2.section("Start").unwrap().get("startup").is_none());
+    }
+
     #[test]
     fn ensure_modeled_keys_skips_defaults_and_appends_changes() {
         // 原文件没有 tree_* 键：未改动的默认值不得补写；改过的必须补写。
