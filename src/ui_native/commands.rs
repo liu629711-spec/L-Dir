@@ -355,10 +355,7 @@ pub unsafe fn dispatch(frame: &mut MainFrame, main: HWND, id: u32) -> bool {
             let theme = id - cmd_id::THEME_BASE;
             frame.config.colorthema = theme;
             frame.session.colorthema = theme;
-            println!("[qdir-rs] TEST 配色档位 colorthema={theme}");
-            for i in 0..4 {
-                unsafe { frame.fill_pane(i) };
-            }
+            frame.apply_theme_palette(main, theme);
             true
         }
         id if (cmd_id::ACTIVE_BASE..cmd_id::ACTIVE_BASE + 4).contains(&id) => {

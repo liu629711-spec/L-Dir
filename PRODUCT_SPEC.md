@@ -123,6 +123,16 @@ P1 必须（产品可用性），按行为表证据实现；P2 体验完整；P3
   与消息泵加速键表 F3（CreateAcceleratorTableW+TranslateAcceleratorW）=
   聚焦活动窗格过滤框，键入即接上面的快速过滤。实测：F3 后 GetGUIThreadInfo
   焦点句柄=窗格1 过滤 Edit（id 1003）。
+- ✅ 主题色接 UI（2026-10-22）：`menu::theme_palette` 五档自设计配色
+  （R3——原版字面 `#14F3FF (B)/#000000/#14F3FF/#999999/#matrix` 只确证
+  档位数量与字面值，渲染语义无字节取证；我们把字面十六进制值落为
+  窗格列表/树底色+前景，(B) 解读为深色底变体，matrix=黑底绿字）。
+  `MainFrame::apply_theme_palette`：LVM/TVM SETBKCOLOR/SETTEXTCOLOR +
+  重灌四窗格 + RedrawWindow(ALLCHILDREN)；档 0 用 CLR_DEFAULT 复位系统色。
+  Filter2 命中行的前景色优先级不变（custom-draw 按预算色写回）。
+  实测：LVM_GETBKCOLOR 四档读回 001b1414/00fff314/00999999/00081800
+  （BGR 序与 RGB 设计值一致），复位后控件回系统默认。单测 1 个。
+
 - 高亮/过滤规则编辑对话框（自绘模板）、
 标签行为开关（双击关/中键关/提示气泡——分支确证）、打印、查找、
 颜色主题档位（自设计）、状态栏 5 段信息完善

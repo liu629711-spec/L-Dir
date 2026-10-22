@@ -550,6 +550,46 @@ impl MainFrame {
         LRESULT(0)
     }
 
+    /// 应用配色档（`menu::theme_palette` 自设计表，R3）到四窗格的列表底色/
+    /// 前景与树底色/前景；档 0（默认）用 CLR_DEFAULT 复位系统色。
+    /// 换档后重灌四窗格（行色预算里的 Filter2 命中色保持不变——
+    /// 前景覆盖仅对**未命中规则**的行生效，custom-draw 已按此优先级写回）。
+    pub unsafe fn apply_theme_palette(&mut self, main: HWND, theme: u32) {
+        // CLR_DEFAULT(-1) = 恢复系统色；LVM_/TVM_ 颜色消息 wParam=0, lParam=COLORREF。
+        let (bg, fg): (i32, i32) = match crate::ui_native::menu::theme_palette(theme) {
+            None => (CLR_DEFAULT, CLR_DEFAULT),
+            Some((b, f)) => (
+                rgb_to_colorref(b) as i32,
+                f.map(|c| rgb_to_colorref(c) as i32).unwrap_or(CLR_DEFAULT),
+            ),
+        };
+        let mut applied = 0usize;
+        for p in self.panes.iter() {
+            if let Some(lv) = p.list {
+                let _ = SendMessageW(lv, LVM_SETBKCOLOR, Some(WPARAM(0)), Some(LPARAM(bg as isize)));
+                let _ = SendMessageW(lv, LVM_SETTEXTCOLOR, Some(WPARAM(0)), Some(LPARAM(fg as isize)));
+                applied += 1;
+            }
+            // 树只有激活时才可见/存在节点；颜色设置无害，统一刷。
+            if let Some(tv) = p.tree {
+                let _ = SendMessageW(tv, TVM_SETBKCOLOR, Some(WPARAM(0)), Some(LPARAM(bg as isize)));
+                let _ = SendMessageW(tv, TVM_SETTEXTCOLOR, Some(WPARAM(0)), Some(LPARAM(fg as isize)));
+            }
+        }
+        println!(
+            "[qdir-rs] TEST 配色档位 colorthema={theme} 应用窗格={applied} bg={bg:#x} fg={fg:#x}"
+        );
+        for i in 0..4 {
+            self.fill_pane(i);
+        }
+        let _ = RedrawWindow(
+            Some(main),
+            None,
+            None,
+            RDW_INVALIDATE | RDW_UPDATENOW | RDW_ALLCHILDREN,
+        );
+    }
+
     /// 某个窗格当前选中行的路径集合（ListView 实时查询）。
     pub fn selected_paths(&self, index: usize) -> Vec<std::path::PathBuf> {
         let Some(list) = self.panes[index].list else {

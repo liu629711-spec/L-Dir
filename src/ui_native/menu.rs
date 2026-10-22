@@ -69,6 +69,22 @@ fn popup(parent: HMENU, text: &str) -> HMENU {
     m
 }
 
+/// 配色档（自设计，R3；原版菜单字面 `#14F3FF (B)/#000000/#14F3FF/#999999/#matrix`
+/// 只确证了档位数量与字面值，渲染语义无字节取证——这里把字面值落为窗格列表底色，
+/// (B) 变体按原版按钮观感解读为深色底。`(bg, text)` 均为 RGB；None=系统默认。
+/// 档名即 THEMES 顺序（0..4）。
+pub fn theme_palette(idx: u32) -> Option<(crate::core::Rgb, Option<crate::core::Rgb>)> {
+    use crate::core::Rgb;
+    match idx {
+        0 => None, // 默认：系统色（CLR_DEFAULT 复位路径在 mainframe）
+        1 => Some((Rgb(0x14, 0x14, 0x1B), Some(Rgb(0xE0, 0xE6, 0xE2)))), // #14F3FF (B)：深色底+浅字
+        2 => Some((Rgb(0x14, 0xF3, 0xFF), Some(Rgb(0x10, 0x2A, 0x33)))), // #14F3FF：亮青底+深字
+        3 => Some((Rgb(0x99, 0x99, 0x99), Some(Rgb(0x1A, 0x1A, 0x1A)))), // #999999：灰底+深字
+        4 => Some((Rgb(0x00, 0x18, 0x08), Some(Rgb(0x00, 0xD9, 0x4A)))), // matrix：黑底绿字
+        _ => None,
+    }
+}
+
 /// 构建主菜单（自绘文案与结构）。调用方持有返回的 HMENU 生命周期。
 pub fn build_main_menu() -> windows::core::Result<HMENU> {
     let file = unsafe { CreateMenu() }?;
@@ -172,6 +188,17 @@ mod tests {
             assert!(id != 0x5A00, "与 QuickLink 段冲突");
             assert!(id >= 30000, "应全部落在自有 30000+ 段：{id}");
         }
+    }
+
+    #[test]
+    fn 配色档自设计表() {
+        use crate::core::Rgb;
+        assert!(super::theme_palette(0).is_none(), "默认=系统色");
+        assert_eq!(super::theme_palette(1).unwrap().0, Rgb(0x14, 0x14, 0x1B));
+        assert_eq!(super::theme_palette(2).unwrap().0, Rgb(0x14, 0xF3, 0xFF), "菜单字面 #14F3FF");
+        assert_eq!(super::theme_palette(3).unwrap().0, Rgb(0x99, 0x99, 0x99), "菜单字面 #999999");
+        assert_eq!(super::theme_palette(4).unwrap().1, Some(Rgb(0x00, 0xD9, 0x4A)), "matrix 绿字");
+        assert!(super::theme_palette(7).is_none(), "野值=默认");
     }
 
     #[test]
