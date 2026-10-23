@@ -102,12 +102,34 @@ impl App {
             // 0.62 无 UpdateWindow（RedrawWindow 取代）：WM_PAINT 会被自动调度。
             let _ = hwnd;
 
-            // 9. 加速键：F3=查找（聚焦活动窗格过滤框，与文件菜单 FIND 同命令）。
-            let accels: Vec<ACCEL> = vec![ACCEL {
-                fVirt: FVIRTKEY,
-                key: windows::Win32::UI::Input::KeyboardAndMouse::VK_F3.0,
-                cmd: crate::ui_native::menu::cmd_id::FIND as u16,
-            }];
+            // 9. 加速键：F3=查找（聚焦活动窗格过滤框，与文件菜单 FIND 同命令）；
+            //    Ctrl+T=新建标签页（批次A/A5，menu_texts:41 确证）；
+            //    Alt+Left/Right=历史后退/前进（批次C/C4）。
+            //    注：Ctrl+C/X/V/A/Del 保持**局部**（仅列表焦点时经 subclass
+            //    生效，Explorer 语义），不进全局加速键，避免劫持过滤框文本编辑。
+            use windows::Win32::UI::Input::KeyboardAndMouse::{VK_F3, VK_LEFT, VK_RIGHT, VK_T};
+            let accels: Vec<ACCEL> = vec![
+                ACCEL {
+                    fVirt: FVIRTKEY,
+                    key: VK_F3.0,
+                    cmd: crate::ui_native::menu::cmd_id::FIND as u16,
+                },
+                ACCEL {
+                    fVirt: FVIRTKEY | FCONTROL,
+                    key: VK_T.0,
+                    cmd: crate::ui_native::menu::cmd_id::FILE_NEW_TAB as u16,
+                },
+                ACCEL {
+                    fVirt: FVIRTKEY | FALT,
+                    key: VK_LEFT.0,
+                    cmd: crate::ui_native::menu::cmd_id::HIST_BACK as u16,
+                },
+                ACCEL {
+                    fVirt: FVIRTKEY | FALT,
+                    key: VK_RIGHT.0,
+                    cmd: crate::ui_native::menu::cmd_id::HIST_FORWARD as u16,
+                },
+            ];
             let accel_table = unsafe { CreateAcceleratorTableW(&accels) }
                 .unwrap_or(windows::Win32::UI::WindowsAndMessaging::HACCEL::default());
 

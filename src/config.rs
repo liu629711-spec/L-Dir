@@ -61,6 +61,7 @@ mod KEYS {
     /// 开机恢复（自有键名 *待复核*；原版启动行为链未反编译确证）。
     pub const STARTUP: &str = "startup";
     pub const TRAY_MINIMIZE: &str = "tray_minimize";
+    pub const SHOW_HIDDEN: &str = "show_hidden";
     pub const WIN_RC: &str = "WinRC";
     pub const DEFAULT_TAB: &str = "default_tab";
     pub const CHK_INI: &str = "chk_ini";
@@ -578,6 +579,7 @@ pub fn load_config_bytes(bytes: &[u8]) -> QResult<Config> {
         get_bool(&doc, INI_SECTIONS::START, KEYS::START_CRASH, cfg.start_crash)?;
     cfg.startup = get_bool(&doc, INI_SECTIONS::START, KEYS::STARTUP, cfg.startup)?;
     cfg.tray_minimize = get_bool(&doc, INI_SECTIONS::START, KEYS::TRAY_MINIMIZE, cfg.tray_minimize)?;
+    cfg.show_hidden = get_bool(&doc, INI_SECTIONS::START, KEYS::SHOW_HIDDEN, cfg.show_hidden)?;
     if let Some(raw) = doc.get(INI_SECTIONS::START, KEYS::WIN_RC) {
         cfg.win_rc = parse_win_rc(KEYS::WIN_RC, raw)?;
     }
@@ -746,6 +748,7 @@ pub fn apply_config_to_doc(doc: &mut IniDocument, cfg: &Config) {
     doc.set_in_place(start, KEYS::START_CRASH, bool_u8(cfg.start_crash).to_string());
     doc.set_in_place(start, KEYS::STARTUP, bool_u8(cfg.startup).to_string());
     doc.set_in_place(start, KEYS::TRAY_MINIMIZE, bool_u8(cfg.tray_minimize).to_string());
+    doc.set_in_place(start, KEYS::SHOW_HIDDEN, bool_u8(cfg.show_hidden).to_string());
     doc.set_in_place(
         start,
         KEYS::WIN_RC,
@@ -896,6 +899,9 @@ fn ensure_modeled_keys(doc: &mut IniDocument, cfg: &Config) {
     }
     if cfg.tray_minimize != d.tray_minimize {
         pairs.push((KEYS::TRAY_MINIMIZE, bool_u8(cfg.tray_minimize).to_string()));
+    }
+    if cfg.show_hidden != d.show_hidden {
+        pairs.push((KEYS::SHOW_HIDDEN, bool_u8(cfg.show_hidden).to_string()));
     }
     if cfg.tree.no_expando != d.tree.no_expando {
         pairs.push((KEYS::TREE_NO_EXPANDO, bool_u8(cfg.tree.no_expando).to_string()));
@@ -1129,11 +1135,14 @@ impl QdrFolder {
     }
 }
 
-/// 从 UTF-16LE 字节加载 [`SessionState`]。
+/// 从 UTF-16LE 字节加载 [`SessionState`]，并附带四个 `FolderN` 的 IDLIST 原文
+/// （`%XX%XX...` 百分号串；空串=该窗格无 IDLIST）。
 ///
-/// .qdr 是「顶层键」形式（无段头），因此解析结果落在空段名 "" 下。
-/// 缺失键回落到 [`SessionState::default`]。
-pub fn load_session_bytes(bytes: &[u8]) -> QResult<SessionState> {
+/// **路径解码不在此处**：core/config 无 shell 依赖（契约 A1），IDLIST 字节 ↔
+/// 路径的换算由调用方经 `shell::idlist` 完成（解码后覆盖对应标签页 path）。
+/// 历史上 load 侧直接丢弃 IDLIST（差异已登记），导致 .qdr 打开/重启恢复/
+/// 布局槽载入一律丢失窗格路径——本函数把原文交还调用方补齐该链路。
+pub fn load_session_bytes_with_idlists(bytes: &[u8]) -> QResult<(SessionState, [String; 4])> {
     let text = decode_utf16le(bytes)?;
     let doc = IniDocument::parse(&text);
     let mut st = SessionState::default();
@@ -1169,6 +1178,8 @@ pub fn load_session_bytes(bytes: &[u8]) -> QResult<SessionState> {
         st.split_preview.to_qdr_ten_thousandths(),
     )?);
 
+    let mut idlists: [String; 4] = Default::default();
+
     for pane_id in PaneId::ALL {
         let n = pane_id.number();
         let mut pane = PaneState::new(pane_id, st.pane(pane_id).path());
@@ -1180,12 +1191,12 @@ pub fn load_session_bytes(bytes: &[u8]) -> QResult<SessionState> {
         let split = get_u32(&doc, "", &tree_split_key, pane.tree_split * 10)?;
         pane.tree_split = split / 10;
 
-        // FolderN：拆出 ViewModeN / ViewModeFlagsN（E3）。
+        // FolderN：拆出 ViewModeN / ViewModeFlagsN（E3）；IDLIST 原文交还调用方
+        // （core 无 shell 依赖，不在此解码成路径——由 shell::idlist 换算）。
         let folder_key = format!("{}{}", QDR_KEYS::FOLDER, n);
         if let Some(raw) = doc.get("", &folder_key) {
             let folder = QdrFolder::parse(raw)?;
-            // IDLIST 是 PIDL 十六进制串，core 无 shell 依赖、不在此解码成路径；
-            // 路径解析留给 shell 层（差异已登记）。此处仅消费子字段。
+            idlists[(n - 1) as usize] = folder.idlist;
             if let Some(vm) = folder.view_mode {
                 if let Some(tab) = pane.current_tab_mut() {
                     tab.view_mode = ViewMode::from_u32(vm);
@@ -1211,13 +1222,31 @@ pub fn load_session_bytes(bytes: &[u8]) -> QResult<SessionState> {
         *st.pane_mut(pane_id) = pane;
     }
 
-    Ok(st)
+    Ok((st, idlists))
+}
+
+/// 从 UTF-16LE 字节加载 [`SessionState`]（丢弃 IDLIST 原文的便捷包装；
+/// 需要恢复窗格路径的调用方用 [`load_session_bytes_with_idlists`]）。
+pub fn load_session_bytes(bytes: &[u8]) -> QResult<SessionState> {
+    Ok(load_session_bytes_with_idlists(bytes)?.0)
 }
 
 /// 把 [`SessionState`] 写回一个已解析的 .qdr 文档（顶层键形式）。
 ///
 /// 未建模的顶层键（`windowplacement`、未知未来键）由 doc 原样保留。
+/// 不带路径编码的便捷包装（保留既有调用方/测试行为）。
 pub fn apply_session_to_doc(doc: &mut IniDocument, st: &SessionState) {
+    apply_session_to_doc_with(doc, st, None);
+}
+
+/// [`apply_session_to_doc`] 的完整版：`encode_idlist` 非 None 时，对
+/// **原文档缺失 FolderN 或 IDLIST 为空**的窗格，用当前标签页路径编码注入
+/// （否则新文件会写出空路径的会话——布局槽/重启恢复曾因此丢失全部窗格路径）。
+pub fn apply_session_to_doc_with(
+    doc: &mut IniDocument,
+    st: &SessionState,
+    encode_idlist: Option<&dyn Fn(&Path) -> Option<String>>,
+) {
     doc.set("", QDR_KEYS::VERSION, st.version.clone());
     doc.set("", QDR_KEYS::VIEW_MODE, st.view_mode.to_string());
     // 万分数精度：SplitPermille 只存千分比（契约类型，不可改），
@@ -1251,6 +1280,8 @@ pub fn apply_session_to_doc(doc: &mut IniDocument, st: &SessionState) {
         doc.set("", &format!("Tree{n}split"), (pane.tree_split * 10).to_string());
 
         // FolderN：保留原 IDLIST 与子字段，只在标签页显式覆盖时改 ViewModeN。
+        // 原文档缺失/IDLIST 为空且提供了编码器时，用当前标签页路径编码注入
+        // （新文件此前会写出空路径会话——路径全丢）。
         let folder_key = format!("{}{}", QDR_KEYS::FOLDER, n);
         let mut folder = doc
             .get("", &folder_key)
@@ -1259,6 +1290,17 @@ pub fn apply_session_to_doc(doc: &mut IniDocument, st: &SessionState) {
                 idlist: String::new(),
                 ..QdrFolder::default()
             });
+        if folder.idlist.is_empty() {
+            if let Some(enc) = encode_idlist {
+                if let Some(tab) = pane.current_tab() {
+                    if !tab.path.as_os_str().is_empty() {
+                        if let Some(hex) = enc(&tab.path) {
+                            folder.idlist = hex;
+                        }
+                    }
+                }
+            }
+        }
         // 注意：不能写 `pane.view_mode()`（生效值）—— 那会把「未显式设置」
         // 固化成默认值，破坏往返。只有标签页显式覆盖时才写子字段；
         // 否则保留原文件的原始值（实测 ViewMode1=4 超出 0..=3 枚举范围，
@@ -1307,15 +1349,36 @@ pub fn save_config(path: &Path, cfg: &Config) -> QResult<()> {
 
 /// 加载 start.qdr；文件不存在时返回 [`SessionState::default`]（不 panic）。
 pub fn load_session(path: &Path) -> QResult<SessionState> {
+    Ok(load_session_with_idlists(path)?.0)
+}
+
+/// [`load_session`] 的完整版：附带四个 `FolderN` 的 IDLIST 原文
+/// （调用方经 `shell::idlist::idlist_hex_to_path` 解码后覆盖窗格路径）。
+/// 文件不存在时返回默认会话 + 四个空 IDLIST。
+pub fn load_session_with_idlists(path: &Path) -> QResult<(SessionState, [String; 4])> {
     match fs::read(path) {
-        Ok(bytes) => load_session_bytes(&bytes),
-        Err(e) if e.kind() == std::io::ErrorKind::NotFound => Ok(SessionState::default()),
+        Ok(bytes) => load_session_bytes_with_idlists(&bytes),
+        Err(e) if e.kind() == std::io::ErrorKind::NotFound => {
+            Ok((SessionState::default(), Default::default()))
+        }
         Err(e) => Err(QError::from_io(&e)),
     }
 }
 
 /// 保存 start.qdr（UTF-16LE），保留未建模键。
 pub fn save_session(path: &Path, st: &SessionState) -> QResult<()> {
+    save_session_with(path, st, None)
+}
+
+/// 保存 start.qdr，并给「新文件/空 IDLIST」的 `FolderN` 注入路径编码。
+///
+/// `encode_idlist`：`路径 -> %XX%XX...`（调用方经 `shell::idlist::path_to_idlist_hex`
+/// 注入；core/config 无 shell 依赖）。已有 IDLIST 的原文件不受影响（E2 保留原文）。
+pub fn save_session_with(
+    path: &Path,
+    st: &SessionState,
+    encode_idlist: Option<&dyn Fn(&Path) -> Option<String>>,
+) -> QResult<()> {
     let mut doc = match fs::read(path) {
         Ok(bytes) => {
             let text = decode_utf16le(&bytes)?;
@@ -1326,7 +1389,7 @@ pub fn save_session(path: &Path, st: &SessionState) -> QResult<()> {
         }
         Err(e) => return Err(QError::from_io(&e)),
     };
-    apply_session_to_doc(&mut doc, st);
+    apply_session_to_doc_with(&mut doc, st, encode_idlist);
     write_utf16le_file(path, &doc.to_text())
 }
 
@@ -1615,6 +1678,35 @@ mod tests {
         let back = parse_view_state(&s).expect("可解析");
         assert_eq!(back.view_mode, c.view_mode);
     }
+    #[test]
+    fn show_hidden_key_roundtrip_and_ensure() {
+        // 批次C/C1：show_hidden 键解析→写回往返；缺键时只有改过才补写。
+        let mut doc = IniDocument::parse("[Start]
+Als=5
+");
+        let mut cfg = Config::default();
+        assert!(cfg.show_hidden, "默认 true=保持现行行为");
+        cfg.show_hidden = false;
+        apply_config_to_doc(&mut doc, &cfg);
+        let sec = doc.section("Start").unwrap();
+        assert_eq!(sec.get("show_hidden"), Some("0"), "改过的 show_hidden 补写");
+        let text = doc.to_text();
+        let back = load_config_bytes(&encode_utf16le(&text)).unwrap();
+        assert!(!back.show_hidden);
+        // 显式写 1 → 解析为 true。
+        let mut doc2 = IniDocument::parse("[Start]
+show_hidden=1
+");
+        let cfg2 = load_config_bytes(&encode_utf16le(&doc2.to_text())).unwrap();
+        assert!(cfg2.show_hidden);
+        // show_hidden=true（默认）不补写。
+        let mut doc3 = IniDocument::parse("[Start]
+Als=5
+");
+        apply_config_to_doc(&mut doc3, &Config::default());
+        assert!(doc3.section("Start").unwrap().get("show_hidden").is_none());
+    }
+
     #[test]
     fn startup_key_roundtrip_and_ensure() {
         // startup 键：解析→写回往返；缺键时只有改过才补写（ensure 路径）。

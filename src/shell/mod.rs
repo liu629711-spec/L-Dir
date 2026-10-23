@@ -26,10 +26,12 @@ mod dragdrop;
 mod enumerate;
 mod fileops;
 mod icons;
+mod idlist;
 mod special;
 mod startup;
 mod system;
 mod tray;
+mod watch;
 
 pub use clipboard::{
     ClipboardContent, clipboard_has_files, copy_to_clipboard, cut_to_clipboard, get_clipboard,
@@ -40,8 +42,14 @@ pub use contextmenu::{
     screen_to_client, set_default_item, set_menu_style,
 };
 pub use dragdrop::{
-    DragOutcome, DropFiles, DropTarget, accept_drop_files, allows_copy, allows_move, begin_drag,
-    register_drop_target, revoke_drop_target,
+    DragOutcome, DropFiles, DropReject, DropTarget, DroppedPaths, PaneDropTarget, accept_drop_files,
+    allows_copy, allows_move, begin_drag, begin_drag_ex, drop_reject_reason,
+    paths_from_data_object, push_dropped, register_drop_target, resolve_drop_effect,
+    revoke_drop_target, take_dropped, DROPEFFECT_COPY_VALUE, DROPEFFECT_MOVE_VALUE,
+};
+pub use watch::{register_change_notify, WatchHandle};
+pub use idlist::{
+    decode_pidl_hex, encode_pidl_hex, idlist_hex_to_path, path_to_idlist_hex,
 };
 pub use enumerate::{
     EnumOptions, FileItemExt, display_name_of, is_filesystem_path, list_directory,

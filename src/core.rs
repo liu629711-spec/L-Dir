@@ -934,6 +934,29 @@ impl ColumnConfig {
         )
     }
 
+    /// 列可见性位串（批次D/D3 持久化用；qdr `ColsVisibleN` 自名键）。
+    /// 按 `columns` 顺序逐列输出 '1'/'0'，如 `"11110"`。
+    pub fn cols_visible_string(&self) -> String {
+        self.columns
+            .iter()
+            .map(|c| if c.visible { '1' } else { '0' })
+            .collect()
+    }
+
+    /// 应用列可见性位串（批次D/D3）。纯函数：
+    /// - 串长短于列数：仅覆盖前 N 列，其余保持原 visible；
+    /// - 非 '0'/'1' 字符：该列保持原 visible（前向兼容）；
+    /// - 空串：整体不动。
+    pub fn apply_cols_visible_string(&mut self, s: &str) {
+        for (i, c) in self.columns.iter_mut().enumerate() {
+            match s.as_bytes().get(i) {
+                Some(b'1') => c.visible = true,
+                Some(b'0') => c.visible = false,
+                _ => {} // 越短或非法字符：保持
+            }
+        }
+    }
+
     /// 解析上面的状态串；未知键忽略以保证前向兼容。
     pub fn parse_view_state_string(s: &str) -> QResult<Self> {
         let mut cfg = ColumnConfig::default();
@@ -1274,6 +1297,9 @@ pub struct Config {
     pub startup: bool,
     /// 最小化到托盘（[Start] `tray_minimize`；原版托盘行为链未确证 *待复核*）。
     pub tray_minimize: bool,
+    /// 列表显示隐藏/系统文件（批次C/C1；默认 true=保持现行行为。
+    /// 原版对应文件夹选项族 0x8019–0x802B，键名自定 *待复核*）。
+    pub show_hidden: bool,
     // 目录树 / 标签页 / 文件操作
     pub tree: TreeConfig,
     pub tab: TabConfig,
@@ -1310,6 +1336,7 @@ impl Default for Config {
             rules: default_rules(),
             startup: false,
             tray_minimize: false,
+            show_hidden: true,
             tree: TreeConfig::default(),
             tab: TabConfig::default(),
             file_ops: FileOpsConfig::default(),
@@ -1735,6 +1762,28 @@ mod tests {
         assert_eq!(back2.view_mode, ViewMode::List);
         assert!(ColumnConfig::parse_view_state_string("ViewMode,9").is_err());
         assert_eq!(ColumnConfig::default().image_size, 16);
+    }
+
+    #[test]
+    fn cols_visible_string_roundtrip_and_tolerance() {
+        // 批次D/D3：可见性位串往返；短串/非法字符容忍。
+        let mut cfg = ColumnConfig::default();
+        cfg.apply_cols_visible_string("11010");
+        assert_eq!(cfg.cols_visible_string(), "11010");
+        assert!(cfg.columns[0].visible && cfg.columns[1].visible);
+        assert!(!cfg.columns[2].visible && cfg.columns[3].visible);
+        assert!(!cfg.columns[4].visible);
+        // 短串只覆盖前 N 列，其余保持。
+        cfg.apply_cols_visible_string("0");
+        assert!(!cfg.columns[0].visible);
+        assert!(cfg.columns[1].visible, "短串不得动后续列");
+        // 非法字符保持原值；空串整体不动。
+        cfg.apply_cols_visible_string("1x11");
+        assert!(cfg.columns[0].visible);
+        assert!(cfg.columns[1].visible, "x 保持原值（原为可见）");
+        let before = cfg.cols_visible_string();
+        cfg.apply_cols_visible_string("");
+        assert_eq!(cfg.cols_visible_string(), before, "空串不动");
     }
 
     #[test]

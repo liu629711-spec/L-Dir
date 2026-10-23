@@ -3,3 +3,6 @@ target/
 Q-Dir.ini
 start.qdr
 L-dirqdir-rsexport_hook.csv
+shot*.png
+ua_*.json
+qdir_t.err

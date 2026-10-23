@@ -24,7 +24,8 @@ use windows::Win32::Storage::FileSystem::{
 use windows::Win32::System::Com::IBindCtx;
 use windows::Win32::UI::Shell::{
     IShellFolder, SHCONTF_FOLDERS, SHCONTF_INCLUDEHIDDEN, SHCONTF_NONFOLDERS,
-    SHGFI_DISPLAYNAME, SHGFI_SYSICONINDEX, SHGFI_TYPENAME, SHGFI_USEFILEATTRIBUTES,
+    SHGFI_DISPLAYNAME, SHGFI_SMALLICON, SHGFI_SYSICONINDEX, SHGFI_TYPENAME,
+    SHGFI_USEFILEATTRIBUTES,
     SHGetDesktopFolder, SHGetFileInfoW, SHGDN_FORPARSING, SHParseDisplayName, StrRetToBufW,
 };
 use windows::Win32::UI::Shell::Common::{ITEMIDLIST, STRRET};
@@ -289,7 +290,7 @@ fn query_icon_index(path: &Path, attrs: u32) -> Option<i32> {
     let info = query_file_info(
         path,
         attrs,
-        SHGFI_SYSICONINDEX | SHGFI_USEFILEATTRIBUTES,
+        SHGFI_SMALLICON | SHGFI_SYSICONINDEX | SHGFI_USEFILEATTRIBUTES,
     )?;
     Some(info.iIcon)
 }

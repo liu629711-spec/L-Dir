@@ -161,6 +161,10 @@ pub fn delete_files(
 }
 
 /// 重命名单个路径（同目录内改名，用 FO_RENAME）。
+///
+/// SHFileOperationW(FO_RENAME) 要求 `pTo` 为**完整目标路径**（与源同目录 +
+/// 新名）；只传裸名会被判为跨目录而返回 DE_DIFFDIR(115)。故此处把
+/// `new_name` 拼到源路径的父目录后再交给 shell API。
 pub fn rename_path(
     hwnd: HostWindow,
     path: &Path,
@@ -175,8 +179,13 @@ pub fn rename_path(
             "新名称含有非法字符：{new_name:?}"
         )));
     }
+    // 目标 = 源父目录 + 新名（FO_RENAME 同目录语义）。无父目录（卷根）不可改名。
+    let parent = path.parent().filter(|p| !p.as_os_str().is_empty()).ok_or_else(|| {
+        QError::InvalidPath(format!("无父目录，无法重命名：{}", path.display()))
+    })?;
+    let dest = parent.join(new_name);
     let from = path_to_wide(path)?;
-    let to = to_wide(new_name);
+    let to = path_to_wide(&dest)?;
     let flags = op_flags(opts, false);
     sh_file_op(hwnd, FO_RENAME, &from, &to, flags)
 }

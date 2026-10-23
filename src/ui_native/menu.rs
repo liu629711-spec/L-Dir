@@ -24,6 +24,9 @@ pub mod cmd_id {
     pub const FILE_EXPORT: u32 = 30009; // 导出列表…（原 0x8030=32816）
     pub const FILE_PRINT: u32 = 30010; // 打印（原版菜单项确证存在；id 未确证*待复核*）
     pub const FIND: u32 = 30011; // 查找 F3（=聚焦活动窗格过滤框；原版 id 未确证*待复核*）
+    // 批次A：新建文件夹（A4）/ 新建标签页（A5，Ctrl+T）
+    pub const FILE_NEW_FOLDER: u32 = 30014; // 新建文件夹(&N)
+    pub const FILE_NEW_TAB: u32 = 30015; // 新建标签页(Ctrl+T)
     // 查看
     pub const VIEW_ICON: u32 = 30021;
     pub const VIEW_SMALL_ICON: u32 = 30022;
@@ -37,6 +40,14 @@ pub mod cmd_id {
     // 规则编辑（附录 A.1：原版窗格按钮 tooltip「过滤器或高亮」+ 查看系；
     // 原版 id 未反编译确证*待复核*，此处自定 30035）
     pub const RULES_EDIT: u32 = 30035;
+    pub const VIEW_RENAME: u32 = 30036; // 批次A/A3：重命名(F2)，走同一条 LVM_EDITLABEL
+    pub const VIEW_SHOW_HIDDEN: u32 = 30037; // 批次C/C1：显示隐藏/系统文件开关
+    pub const HIST_BACK: u32 = 30038; // 批次C/C4：历史后退（Alt+Left）
+    pub const HIST_FORWARD: u32 = 30039; // 批次C/C4：历史前进（Alt+Right）
+    /// 批次D/D3 列显隐子菜单基址（COL_BASE+0..4 = Name/Ext/Size/Modified/Attr）。
+    pub const COL_BASE: u32 = 30040;
+    /// 批次D/D2 布局槽对话框（文件菜单）。
+    pub const FILE_SLOTS: u32 = 30046;
     pub const VIEW_TREE_TOGGLE: u32 = 30029;
     // 树模式三档 + 循环（附录 A.3：原 54001/54002/54003/54006 系）。
     pub const VIEW_TREE_SPLIT: u32 = 30030; // tree_mode=1 双列
@@ -115,6 +126,10 @@ pub fn build_main_menu() -> windows::core::Result<HMENU> {
     add(m, "保存当前状态(&S)…", cmd_id::FILE_SAVE_STATE);
     add(m, "保存状态到桌面(&L)", cmd_id::FILE_SAVE_STATE_DESKTOP);
     add(m, "重复窗口(&D)", cmd_id::FILE_DUP_WINDOW);
+    add(m, "布局槽(&L)…", cmd_id::FILE_SLOTS);
+    let _ = unsafe { AppendMenuW(m, MF_SEPARATOR, 0, PCWSTR::null()) };
+    add(m, "新建文件夹(&N)", cmd_id::FILE_NEW_FOLDER);
+    add(m, "新建标签页(Ctrl+T)", cmd_id::FILE_NEW_TAB);
     let _ = unsafe { AppendMenuW(m, MF_SEPARATOR, 0, PCWSTR::null()) };
     add(m, "命令行(&C)", cmd_id::FILE_CMD);
     add(m, "PowerShell(&P)", cmd_id::FILE_POWERSHELL);
@@ -135,6 +150,34 @@ pub fn build_main_menu() -> windows::core::Result<HMENU> {
     add(vm, "列表(&L)", cmd_id::VIEW_LIST);
     add(vm, "详细信息(&D)", cmd_id::VIEW_DETAILS);
     add(v, "显示网格线(&G)", cmd_id::VIEW_GRIDLINES);
+    add(v, "重命名(&F2)", cmd_id::VIEW_RENAME);
+    add(v, "显示隐藏文件(&H)", cmd_id::VIEW_SHOW_HIDDEN);
+    add(v, "后退(&B)\tAlt+Left", cmd_id::HIST_BACK);
+    add(v, "前进(&F)\tAlt+Right", cmd_id::HIST_FORWARD);
+    add(v, "新建标签页(&E)\tCtrl+T", cmd_id::FILE_NEW_TAB);
+    // 批次D/D3：列显隐子菜单（勾选态在 WM_INITMENUPOPUP 按活动窗格刷新）。
+    {
+        let cols = popup(v, "列(&C)");
+        let items: [(&str, &str); 5] = [
+            ("名称(&N)", "Name"),
+            ("扩展名(&X)", "Ext"),
+            ("大小(&S)", "Size"),
+            ("修改日期(&M)", "Modified"),
+            ("属性(&A)", "Attr"),
+        ];
+        for (i, (label, key)) in items.iter().enumerate() {
+            let w = s(label);
+            let _ = unsafe {
+                AppendMenuW(
+                    cols,
+                    MF_STRING,
+                    (cmd_id::COL_BASE + i as u32) as usize,
+                    PCWSTR(w.as_ptr()),
+                )
+            };
+            let _ = key; // key 由 COLUMN_KEYS 按序对应（menu 顺序=COLUMN_KEYS 顺序）
+        }
+    }
     add(v, "预览面板(&P)", cmd_id::VIEW_PREVIEW_TOGGLE);
     add(v, "高亮/着色规则(&K)…", cmd_id::RULES_EDIT);
     let _ = unsafe { AppendMenuW(v, MF_SEPARATOR, 0, PCWSTR::null()) };

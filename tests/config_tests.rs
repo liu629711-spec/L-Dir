@@ -61,7 +61,15 @@ fn ini_byte_identical_roundtrip_on_real_file() {
     assert_eq!(cfg.designe_mode, 1);
     assert_eq!(cfg.show_cmd, 3);
     assert_eq!(cfg.langid, 1031);
-    assert_eq!(cfg.win_rc, [0, 0, 800, 600]);
+    // WinRC 是运行时状态键（原版退出时按窗口实际位置回写；夹具
+    // 实测见过 0;0;800;600 与 40;40;1140;840 两种），同 qdir_id
+    // 不钉具体值，只校验解析出「宽高为正」的 4 整数。
+    assert_eq!(cfg.win_rc.len(), 4);
+    assert!(
+        cfg.win_rc[2] > 0 && cfg.win_rc[3] > 0,
+        "WinRC 宽高应为正，实测 {:?}",
+        cfg.win_rc
+    );
     assert_eq!(cfg.favoriten_dir, PathBuf::from(".\\Favoriten\\"));
     assert_eq!(cfg.quick_link_dir, PathBuf::from(".\\Favoriten\\Quick-Link\\"));
     assert_eq!(cfg.preview_filter, "*;");

@@ -94,8 +94,11 @@ pub unsafe fn dispatch(frame: &mut MainFrame, main: HWND, id: u32) -> bool {
         // —— 文件：状态（附录 A.1 确证语义；自绘 id）——
         cmd_id::FILE_OPEN_STATE => {
             if let Some(path) = run_state_dialog(main, false) {
-                match crate::config::load_session(&path) {
-                    Ok(st) => {
+                // IDLIST 解码恢复窗格路径（批次D/D2：此前丢弃 IDLIST，
+                // .qdr 打开后四个窗格全部落在默认路径）。
+                match crate::config::load_session_with_idlists(&path) {
+                    Ok((mut st, idlists)) => {
+                        crate::ui_native::apply_idlist_paths(&mut st, &idlists);
                         apply_session(frame, st);
                         println!("[qdir-rs] TEST 状态载入 {path:?}");
                     }
@@ -106,7 +109,12 @@ pub unsafe fn dispatch(frame: &mut MainFrame, main: HWND, id: u32) -> bool {
         }
         cmd_id::FILE_SAVE_STATE => {
             if let Some(path) = run_state_dialog(main, true) {
-                match crate::config::save_session(&path, &frame.session) {
+                // IDLIST 编码注入（批次D/D2）：新文件写出可被载入恢复的路径。
+                match crate::config::save_session_with(
+                    &path,
+                    &frame.session,
+                    Some(&crate::ui_native::qdr_idlist_encoder),
+                ) {
                     Ok(()) => println!("[qdir-rs] TEST 状态保存 {path:?}"),
                     Err(e) => eprintln!("[qdir-rs] 状态保存失败：{e}"),
                 }
@@ -116,7 +124,11 @@ pub unsafe fn dispatch(frame: &mut MainFrame, main: HWND, id: u32) -> bool {
         cmd_id::FILE_SAVE_STATE_DESKTOP => {
             let dir = shell::desktop_path().unwrap_or_else(|_| std::path::PathBuf::from("."));
             let path = dir.join(brand::SESSION_FILE);
-            match crate::config::save_session(&path, &frame.session) {
+            match crate::config::save_session_with(
+                &path,
+                &frame.session,
+                Some(&crate::ui_native::qdr_idlist_encoder),
+            ) {
                 Ok(()) => println!("[qdir-rs] TEST 状态存桌面 {path:?}"),
                 Err(e) => eprintln!("[qdir-rs] 状态存桌面失败：{e}"),
             }
@@ -125,8 +137,12 @@ pub unsafe fn dispatch(frame: &mut MainFrame, main: HWND, id: u32) -> bool {
         cmd_id::FILE_DUP_WINDOW => {
             // 重复窗口（附录 A.1：原 E100=存临时状态 + 新实例加载）。
             let tmp = std::env::temp_dir().join("L-Dir.clone.qdr");
-            match crate::config::save_session(&tmp, &frame.session)
-                .and_then(|_| duplicate_window(&tmp))
+            match crate::config::save_session_with(
+                &tmp,
+                &frame.session,
+                Some(&crate::ui_native::qdr_idlist_encoder),
+            )
+            .and_then(|_| duplicate_window(&tmp))
             {
                 Ok(()) => println!("[qdir-rs] TEST 重复窗口 -> {tmp:?}"),
                 Err(e) => eprintln!("[qdir-rs] 重复窗口失败：{e}"),
@@ -209,6 +225,72 @@ pub unsafe fn dispatch(frame: &mut MainFrame, main: HWND, id: u32) -> bool {
             // 查找（F3）= 聚焦活动窗格过滤框（键入即快速筛名）。
             frame.focus_filter_edit(pane_idx);
             println!("[qdir-rs] TEST 查找：聚焦窗格{}过滤框", pane_idx + 1);
+            true
+        }
+        cmd_id::FILE_NEW_FOLDER => {
+            // A4：在活动窗格路径新建「新建文件夹」（唯一名）→ 选中 → 内联重命名。
+            let _ = frame.new_folder_in_pane(pane_idx, main);
+            true
+        }
+        cmd_id::FILE_NEW_TAB => {
+            // A5：活动窗格新建标签页（Ctrl+T；menu_texts:41 确证）。
+            let path = frame.pane_path(pane_idx);
+            unsafe { frame.pane_add_tab(pane_idx, path) };
+            true
+        }
+        cmd_id::VIEW_RENAME => {
+            // A3：重命名（F2）——对活动窗格选中行走同一条 LVM_EDITLABEL。
+            let ok = frame.start_inline_rename(pane_idx);
+            println!(
+                "[qdir-rs] TEST 重命名菜单 窗格{} -> {}",
+                pane_idx + 1,
+                if ok { "进入编辑" } else { "不可编辑(非单行选中)" }
+            );
+            true
+        }
+        cmd_id::VIEW_SHOW_HIDDEN => {
+            // 批次C/C1：隐藏/系统文件显示开关（默认 true=显示）。
+            frame.config.show_hidden = !frame.config.show_hidden;
+            let on = frame.config.show_hidden;
+            match crate::config::save_config(&frame.ini_path, &frame.config) {
+                Ok(()) => println!("[qdir-rs] TEST 显示隐藏文件={on} 已存 ini"),
+                Err(e) => eprintln!("[qdir-rs] 显示隐藏文件配置保存失败：{e}"),
+            }
+            for i in 0..4 {
+                unsafe { frame.fill_pane(i) };
+            }
+            true
+        }
+        cmd_id::HIST_BACK => {
+            // 批次C/C4：历史后退（Alt+Left / 菜单）。
+            let moved = frame.go_history(pane_idx, false);
+            println!(
+                "[qdir-rs] TEST 历史后退 窗格{} -> {}",
+                pane_idx + 1,
+                if moved { "完成" } else { "无历史" }
+            );
+            true
+        }
+        cmd_id::HIST_FORWARD => {
+            // 批次C/C4：历史前进（Alt+Right / 菜单）。
+            let moved = frame.go_history(pane_idx, true);
+            println!(
+                "[qdir-rs] TEST 历史前进 窗格{} -> {}",
+                pane_idx + 1,
+                if moved { "完成" } else { "无前进" }
+            );
+            true
+        }
+        // 批次D/D3：列显隐（id = COL_BASE + 列序，序见 mainframe::COLUMN_KEYS）。
+        id if (cmd_id::COL_BASE..cmd_id::COL_BASE + 5).contains(&id) => {
+            let i = (id - cmd_id::COL_BASE) as usize;
+            let key = crate::ui_native::mainframe::COLUMN_KEYS[i];
+            frame.toggle_column(pane_idx, key);
+            true
+        }
+        // 批次D/D2：布局槽对话框。
+        cmd_id::FILE_SLOTS => {
+            run_slots_dialog(frame, main);
             true
         }
         cmd_id::OPTIONS_SETTINGS => {
@@ -437,7 +519,12 @@ pub unsafe fn dispatch(frame: &mut MainFrame, main: HWND, id: u32) -> bool {
                 }
                 4 => {
                     if !bsel.is_empty() {
-                        let opts = shell::FileOpOptions::default();
+                        // A2：删除默认进回收站（allow_undo=true）。原版菜单
+                        // 「撤消 删除 Ctrl+Z」确证默认 FOF_ALLOWUNDO；copy/move 不动。
+                        let opts = shell::FileOpOptions {
+                            allow_undo: true,
+                            ..Default::default()
+                        };
                         if let Err(e) = shell::delete_files(host, &bsel, &opts) {
                             eprintln!("[qdir-rs] 删除失败：{e}");
                         } else {
@@ -651,6 +738,34 @@ fn run_settings_dialog(frame: &mut MainFrame, main: HWND) {
     );
 }
 
+/// 批次D/D2：布局槽对话框 → 保存/载入/删除/复制路径。
+fn run_slots_dialog(frame: &mut MainFrame, main: HWND) {
+    let exe_dir = std::env::current_exe()
+        .ok()
+        .and_then(|e| e.parent().map(|p| p.to_path_buf()))
+        .unwrap_or_else(|| std::path::PathBuf::from("."));
+    let Some(action) = (unsafe { crate::ui_native::slots_dialog::open_slots(main, &exe_dir) })
+    else {
+        println!("[qdir-rs] TEST 布局槽：取消");
+        return;
+    };
+    match action {
+        crate::ui_native::slots_dialog::SlotAction::Save(n) => match frame.slot_save(n) {
+            Ok(()) => println!("[qdir-rs] TEST 布局槽保存 槽{n}"),
+            Err(e) => eprintln!("[qdir-rs] 布局槽保存失败：{e}"),
+        },
+        crate::ui_native::slots_dialog::SlotAction::Load(n) => {
+            frame.slot_load(n);
+        }
+        crate::ui_native::slots_dialog::SlotAction::Delete(n) => {
+            frame.slot_delete(n);
+        }
+        crate::ui_native::slots_dialog::SlotAction::CopyPath(n) => {
+            frame.slot_copy_path(n, main);
+        }
+    }
+}
+
 fn run_rules_dialog(frame: &mut MainFrame, main: HWND) {
     let Some(new_rules) =
         (unsafe { crate::ui_native::rules_dialog::edit_rules(main, &frame.config.rules) })
@@ -678,7 +793,11 @@ fn restart_self(frame: &mut MainFrame, main: HWND, as_admin: bool) {
         .parent()
         .map(|d| d.join(brand::SESSION_FILE))
         .unwrap_or_else(|| std::path::PathBuf::from(brand::SESSION_FILE));
-    let save = crate::config::save_session(&state, &frame.session);
+    let save = crate::config::save_session_with(
+        &state,
+        &frame.session,
+        Some(&crate::ui_native::qdr_idlist_encoder),
+    );
     println!(
         "[qdir-rs] TEST 重新启动 admin={} 状态存 {:?} {}",
         as_admin as u32,

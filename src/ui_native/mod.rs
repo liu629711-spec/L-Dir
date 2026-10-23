@@ -9,10 +9,11 @@ pub mod mainframe;
 pub mod menu;
 pub mod rules_dialog;
 pub mod settings_dialog;
+pub mod slots_dialog;
 pub mod splitter;
 pub mod subclass;
 pub mod toolbar;
 pub mod tree;
 
 pub use app::App;
-pub use mainframe::MainFrame;
+pub use mainframe::{MainFrame, apply_idlist_paths, qdr_idlist_encoder};
