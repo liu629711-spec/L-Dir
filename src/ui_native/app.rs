@@ -104,20 +104,47 @@ impl App {
 
             // 9. 加速键：F3=查找（聚焦活动窗格过滤框，与文件菜单 FIND 同命令）；
             //    Ctrl+T=新建标签页（批次A/A5，menu_texts:41 确证）；
-            //    Alt+Left/Right=历史后退/前进（批次C/C4）。
+            //    Alt+Left/Right=历史后退/前进（批次C/C4）；
+            //    Ctrl+K=重复标签页、Ctrl+Shift+V=选择性粘贴、F9=数据大小信息
+            //    （menu_texts:40/43/102，2026-10-24 批）。
             //    注：Ctrl+C/X/V/A/Del 保持**局部**（仅列表焦点时经 subclass
             //    生效，Explorer 语义），不进全局加速键，避免劫持过滤框文本编辑。
-            use windows::Win32::UI::Input::KeyboardAndMouse::{VK_F3, VK_LEFT, VK_RIGHT, VK_T};
+            use windows::Win32::UI::Input::KeyboardAndMouse::{
+                VK_F11, VK_F3, VK_F9, VK_K, VK_LEFT, VK_RIGHT, VK_T, VK_V,
+            };
             let accels: Vec<ACCEL> = vec![
                 ACCEL {
                     fVirt: FVIRTKEY,
                     key: VK_F3.0,
                     cmd: crate::ui_native::menu::cmd_id::FIND as u16,
                 },
+                // P2：F11 全屏（menu_texts:73「全屏 (F)	F11」确证入口）。
+                ACCEL {
+                    fVirt: FVIRTKEY,
+                    key: VK_F11.0,
+                    cmd: crate::ui_native::menu::cmd_id::VIEW_FULLSCREEN as u16,
+                },
                 ACCEL {
                     fVirt: FVIRTKEY | FCONTROL,
                     key: VK_T.0,
                     cmd: crate::ui_native::menu::cmd_id::FILE_NEW_TAB as u16,
+                },
+                ACCEL {
+                    fVirt: FVIRTKEY | FCONTROL,
+                    key: VK_K.0,
+                    cmd: crate::ui_native::menu::cmd_id::FILE_DUP_TAB as u16,
+                },
+                // P2 audit #22：选择性粘贴（局部 Ctrl+V 会先吃 Ctrl+Shift+V，
+                // subclass.rs 对 Shift+V 显式让路到同一命令，双通道一致）。
+                ACCEL {
+                    fVirt: FVIRTKEY | FCONTROL | FSHIFT,
+                    key: VK_V.0,
+                    cmd: crate::ui_native::menu::cmd_id::EDIT_PASTE_SPECIAL as u16,
+                },
+                ACCEL {
+                    fVirt: FVIRTKEY,
+                    key: VK_F9.0,
+                    cmd: crate::ui_native::menu::cmd_id::FILE_SIZE_INFO as u16,
                 },
                 ACCEL {
                     fVirt: FVIRTKEY | FALT,

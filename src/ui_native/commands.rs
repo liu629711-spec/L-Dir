@@ -281,6 +281,137 @@ pub unsafe fn dispatch(frame: &mut MainFrame, main: HWND, id: u32) -> bool {
             );
             true
         }
+        cmd_id::VIEW_UNDO_DELETE => {
+            // P1.1：撤消 删除（Ctrl+Z / 菜单；menu_texts:79 确证存在）。
+            let ok = frame.undo_last_delete(main);
+            println!(
+                "[qdir-rs] TEST 撤销删除菜单 -> {}",
+                if ok { "完成" } else { "空栈/未恢复" }
+            );
+            true
+        }
+        // P2.9：窗口排列（层叠/横向平铺/纵向平铺；排列图标=LVM_ARRANGE）。
+        cmd_id::WIN_CASCADE | cmd_id::WIN_TILE_H | cmd_id::WIN_TILE_V => {
+            let kind = match id {
+                cmd_id::WIN_TILE_H => crate::ui_native::arrange::ArrangeKind::TileHorizontal,
+                cmd_id::WIN_TILE_V => crate::ui_native::arrange::ArrangeKind::TileVertical,
+                _ => crate::ui_native::arrange::ArrangeKind::Cascade,
+            };
+            let n = unsafe { crate::ui_native::arrange::arrange_windows(kind) };
+            println!("[qdir-rs] TEST 窗口排列 {kind:?} -> {n} 窗");
+            true
+        }
+        cmd_id::WIN_ARRANGE_ICONS => {
+            let ok = frame.arrange_icons_active();
+            println!("[qdir-rs] TEST 排列图标 活动窗格{} -> {}", pane_idx + 1, ok);
+            true
+        }
+        // P2.5：分组依据（无/扩展名/类型；状态在 pane.columns，.qdr 往返）。
+        id if (cmd_id::GROUP_BASE..cmd_id::GROUP_BASE + 3).contains(&id) => {
+            let key = match id - cmd_id::GROUP_BASE {
+                1 => Some("Ext"),
+                2 => Some("Type"),
+                _ => None,
+            };
+            frame.set_group_by_active(key);
+            println!("[qdir-rs] TEST 分组依据 key={key:?} 窗格{}", pane_idx + 1);
+            true
+        }
+        // P2：复制/剪切模式切换（原版 0x8568=0 / 0x8569=1，立即落 ini，
+        // 勾选态 WM_INITMENUPOPUP 刷新）。
+        cmd_id::CC_MODE_COPY | cmd_id::CC_MODE_CUT => {
+            let mode = if id == cmd_id::CC_MODE_CUT { 1u32 } else { 0u32 };
+            frame.config.file_ops.copy_cut_paste_mode = mode;
+            match crate::config::save_config(&frame.ini_path, &frame.config) {
+                Ok(()) => println!("[qdir-rs] TEST 复制剪切模式={mode} 已存 ini"),
+                Err(e) => eprintln!("[qdir-rs] 复制剪切模式保存失败：{e}"),
+            }
+            true
+        }
+        // P2：排序方式（键+方向；menu_texts:75 确证入口，键序=core::SortKey）。
+        id if (cmd_id::SORT_BASE..=cmd_id::SORT_DESC).contains(&id) => {
+            if id <= cmd_id::SORT_BASE + 4 {
+                let key = crate::core::SortKey::from_u32(id - cmd_id::SORT_BASE);
+                frame.set_sort_active(key, None);
+                println!("[qdir-rs] TEST 排序键={key:?} 窗格{}", pane_idx + 1);
+            } else {
+                let dir = if id == cmd_id::SORT_DESC {
+                    crate::core::SortDir::Desc
+                } else {
+                    crate::core::SortDir::Asc
+                };
+                frame.set_sort_active(None, Some(dir));
+                println!("[qdir-rs] TEST 排序方向={dir:?} 窗格{}", pane_idx + 1);
+            }
+            true
+        }
+        // P2：全屏切换（F11；menu_texts:73 确证入口）。
+        cmd_id::VIEW_FULLSCREEN => unsafe {
+            frame.toggle_fullscreen(main);
+            true
+        },
+        // —— 本批（2026-10-24）：编辑菜单族 / 数据大小 / 重复标签 ——
+        // 重复标签页 Ctrl+K（menu_texts:40；=当前路径再开一签）。
+        cmd_id::FILE_DUP_TAB => {
+            let done = frame.keyboard_action(pane_idx, crate::ui_native::mainframe::KbAction::DuplicateTab, main);
+            println!("[qdir-rs] TEST 重复标签页 窗格{} -> {}", pane_idx + 1, done);
+            true
+        }
+        // 全选 / 反选（menu_texts:37/38；Ctrl+A 保持列表局部键盘，菜单走此臂）。
+        cmd_id::EDIT_SELECT_ALL => {
+            let done = frame.keyboard_action(pane_idx, crate::ui_native::mainframe::KbAction::SelectAll, main);
+            println!("[qdir-rs] TEST 编辑全选 窗格{} -> {}", pane_idx + 1, done);
+            true
+        }
+        cmd_id::EDIT_SELECT_INVERT => {
+            let done = frame.keyboard_action(pane_idx, crate::ui_native::mainframe::KbAction::SelectInvert, main);
+            println!("[qdir-rs] TEST 编辑反选 窗格{} -> {}", pane_idx + 1, done);
+            true
+        }
+        // 在新标签页中打开（menu_texts:39：当前目录再开一签）。
+        cmd_id::EDIT_OPEN_IN_NEW_TAB => {
+            let path = pane_path.clone();
+            if path.as_os_str().is_empty() {
+                println!("[qdir-rs] TEST 在新标签页打开 空路径拒绝");
+            } else {
+                unsafe { frame.pane_add_tab(pane_idx, path) };
+                println!(
+                    "[qdir-rs] TEST 在新标签页打开 窗格{} len={}",
+                    pane_idx + 1,
+                    frame.session.panes[pane_idx].tabs.len()
+                );
+            }
+            true
+        }
+        // 在新标签页中打开选择（menu_texts:42：每个选中目录一签）。
+        cmd_id::EDIT_OPEN_SEL_NEW_TAB => {
+            let dirs: Vec<_> = selected.iter().filter(|p| p.is_dir()).cloned().collect();
+            if dirs.is_empty() {
+                println!("[qdir-rs] TEST 打开选择 无目录选中");
+            } else {
+                for d in dirs {
+                    unsafe { frame.pane_add_tab(pane_idx, d) };
+                }
+                println!(
+                    "[qdir-rs] TEST 打开选择 窗格{} 新 {} 签 len={}",
+                    pane_idx + 1,
+                    selected.iter().filter(|p| p.is_dir()).count(),
+                    frame.session.panes[pane_idx].tabs.len()
+                );
+            }
+            true
+        }
+        // 选择性粘贴 Ctrl+Shift+V（menu_texts:43；对话框→plan→执行）。
+        cmd_id::EDIT_PASTE_SPECIAL => {
+            let done = frame.keyboard_action(pane_idx, crate::ui_native::mainframe::KbAction::PasteSpecial, main);
+            println!("[qdir-rs] TEST 选择性粘贴命令 窗格{} -> {}", pane_idx + 1, done);
+            true
+        }
+        // 数据大小信息 F9（menu_texts:102）。
+        cmd_id::FILE_SIZE_INFO => unsafe {
+            frame.size_info_dialog(pane_idx, main);
+            true
+        },
         // 批次D/D3：列显隐（id = COL_BASE + 列序，序见 mainframe::COLUMN_KEYS）。
         id if (cmd_id::COL_BASE..cmd_id::COL_BASE + 5).contains(&id) => {
             let i = (id - cmd_id::COL_BASE) as usize;
@@ -385,7 +516,9 @@ pub unsafe fn dispatch(frame: &mut MainFrame, main: HWND, id: u32) -> bool {
             true
         }
         layout::GO => {
-            show_layout_menu(frame, main);
+            // P2.10：go.png(0xB379) 下拉 = 活动窗格导航历史弹层
+            // （原 0xd20 转发语义的落点解释 *待复核*；选后 go_history_to）。
+            show_history_menu(frame, main);
             true
         }
         layout::UPDATE => {
@@ -415,14 +548,18 @@ pub unsafe fn dispatch(frame: &mut MainFrame, main: HWND, id: u32) -> bool {
         }
                 id if (cmd_id::VIEW_ICON..=cmd_id::VIEW_DETAILS).contains(&id) => {
             // 视图模式：LV_VIEW_ICON=0 / DETAILS=1 / SMALLICON=2 / LIST=3。
+            // P2.7：只作用于活动窗格（A.5）。
             let mode = match id {
                 cmd_id::VIEW_ICON => 0,
                 cmd_id::VIEW_SMALL_ICON => 2,
                 cmd_id::VIEW_LIST => 3,
                 _ => 1,
             };
-            frame.set_view_mode_all(mode);
-            println!("[qdir-rs] TEST 视图模式 id={id} view={mode}");
+            frame.set_view_mode_active(mode);
+            println!(
+                "[qdir-rs] TEST 视图模式 id={id} view={mode} 活动窗格{}",
+                pane_idx + 1
+            );
             true
         }
         cmd_id::VIEW_GRIDLINES => {
@@ -518,19 +655,9 @@ pub unsafe fn dispatch(frame: &mut MainFrame, main: HWND, id: u32) -> bool {
                     }
                 }
                 4 => {
-                    if !bsel.is_empty() {
-                        // A2：删除默认进回收站（allow_undo=true）。原版菜单
-                        // 「撤消 删除 Ctrl+Z」确证默认 FOF_ALLOWUNDO；copy/move 不动。
-                        let opts = shell::FileOpOptions {
-                            allow_undo: true,
-                            ..Default::default()
-                        };
-                        if let Err(e) = shell::delete_files(host, &bsel, &opts) {
-                            eprintln!("[qdir-rs] 删除失败：{e}");
-                        } else {
-                            unsafe { frame.fill_pane(bp) };
-                        }
-                    }
+                    // P1.1：删除统一走撤销记录入口（回收站 + 批次栈；
+                    // 无选中时入口内部直接返回 false，无操作）。
+                    let _ = frame.delete_selection_with_undo(bp, &bsel, main);
                 }
                 5 => {
                     if !bsel.is_empty() {
@@ -541,7 +668,14 @@ pub unsafe fn dispatch(frame: &mut MainFrame, main: HWND, id: u32) -> bool {
                 }
                 6 => {
                     if !bsel.is_empty() {
-                        if let Err(e) = shell::copy_to_clipboard(host, &bsel) {
+                        // P2：copy_cut_paste_mode=1 时复制按钮=剪切
+                        //（原版 AF:108064 同款重包语义）。
+                        let r = if frame.config.file_ops.copy_cut_paste_mode == 1 {
+                            shell::cut_to_clipboard(host, &bsel)
+                        } else {
+                            shell::copy_to_clipboard(host, &bsel)
+                        };
+                        if let Err(e) = r {
                             eprintln!("[qdir-rs] 复制失败：{e}");
                         }
                     }
@@ -577,7 +711,7 @@ fn run_state_dialog(main: HWND, save: bool) -> Option<std::path::PathBuf> {
     let mut buf = [0u16; 260];
     let desc: Vec<u16> = brand::STATE_FILTER_DESC
         .encode_utf16().chain(std::iter::once(0)).collect();
-    // 过滤器：描述 *.qdr  全零结尾。
+    // 过滤器：描述\x00*.qdr\x00 全零结尾。
     let mut filter = desc.clone();
     filter.extend("*.qdr".encode_utf16().chain(std::iter::once(0)));
     filter.push(0);
@@ -645,6 +779,46 @@ fn run_export_dialog(main: HWND) -> Option<std::path::PathBuf> {
     }
 }
 
+
+/// P2.10：历史下拉弹层（活动窗格当前标签页导航历史）。纯函数显示序
+/// （history_menu_entries）→ TrackPopupMenu → 选中回跳 go_history_to。
+/// 弹层 UI 无法无头自动化，纯函数与跳转由钩子/单测覆盖 *弹层待实测*。
+fn show_history_menu(frame: &mut MainFrame, main: HWND) {
+    use crate::ui_native::menu::cmd_id;
+    let pane_idx = (frame.session.focus.number().saturating_sub(1)) as usize;
+    let tabs_pos = frame.session.panes[pane_idx].tabs_pos;
+    let entries = frame.session.panes[pane_idx].tabs[tabs_pos]
+        .history_menu_entries(cmd_id::HIST_MENU_MAX);
+    if entries.len() <= 1 {
+        println!("[qdir-rs] TEST 历史下拉 无可选项（历史 ≤1）");
+        return;
+    }
+    unsafe {
+        let m = match crate::ui_native::menu::build_history_menu(&entries) {
+            Ok(m) => m,
+            Err(_) => return,
+        };
+        let mut pt = POINT::default();
+        let _ = GetCursorPos(&mut pt);
+        let _ = SetForegroundWindow(main);
+        let cmd = TrackPopupMenu(
+            m,
+            TPM_RETURNCMD | TPM_LEFTALIGN | TPM_TOPALIGN,
+            pt.x,
+            pt.y,
+            None,
+            main,
+            None,
+        );
+        let _ = DestroyMenu(m);
+        if cmd.0 >= cmd_id::HIST_BASE as i32 {
+            let di = (cmd.0 - cmd_id::HIST_BASE as i32) as usize;
+            if let Some((hidx, _)) = entries.get(di) {
+                frame.go_history_to(pane_idx, *hidx);
+            }
+        }
+    }
+}
 
 fn show_layout_menu(frame: &mut MainFrame, main: HWND) {
     let _ = frame;

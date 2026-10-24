@@ -35,6 +35,8 @@ type DropEffect = u32;
 pub const DROPEFFECT_COPY_VALUE: DropEffect = 1;
 /// `DROPEFFECT_MOVE`（移动/剪切）。
 pub const DROPEFFECT_MOVE_VALUE: DropEffect = 2;
+/// `DROPEFFECT_LINK`（快捷方式；Alt 拖出）。
+pub const DROPEFFECT_LINK_VALUE: DropEffect = 4;
 /// `MK_CONTROL`（拖放按键决议用）。
 const MK_CONTROL_VALUE: u32 = 0x0008;
 /// `MK_SHIFT`（拖放按键决议用）。
@@ -177,11 +179,15 @@ impl DragOutcome {
 /// [`begin_drag_ex`]。
 pub fn begin_drag(hwnd: HostWindow, paths: &[PathBuf], cut: bool) -> QResult<DragOutcome> {
     let e = if cut { DROPEFFECT_MOVE_VALUE } else { DROPEFFECT_COPY_VALUE };
-    begin_drag_ex(hwnd, paths, e, e)
+    begin_drag_ex(hwnd, paths, e, Some(e))
 }
 
-/// 拖出（批次B/B2）：`allowed`=dwokeffects（可给 COPY|MOVE 双许可），
-/// `preferred`=Preferred DropEffect（目标按此决议光标与默认动作）。
+/// 拖出（批次B/B2）：`allowed`=dwokeffects（原版证据=7 COPY|MOVE|LINK，
+/// AF:107517/115276/178576），`preferred`=Preferred DropEffect 预写——
+/// **P1.2 对齐原版后正常路径传 None**（原版源端无按键预决议、无 Preferred
+/// 预写，效应交由目标端标准规则决议：Explorer 无键=同盘移动/跨盘复制、
+/// Ctrl=复制、Shift=移动、Alt=快捷方式）。本进程窗格间默认移动由
+/// [`resolve_drop_effect`] 的 None→MOVE 惯例承担 *待实测复核*。
 ///
 /// 在 CIDLData 之外额外 `SetData` 一份 CF_HDROP，让本进程 IDropTarget
 /// 与任何 CF_HDROP 阅读器（Explorer/剪贴板链）都能直接取到路径——
@@ -190,7 +196,7 @@ pub fn begin_drag_ex(
     hwnd: HostWindow,
     paths: &[PathBuf],
     allowed: DropEffect,
-    preferred: DropEffect,
+    preferred: Option<DropEffect>,
 ) -> QResult<DragOutcome> {
     if paths.is_empty() {
         return Ok(DragOutcome::None);
@@ -250,13 +256,16 @@ pub fn begin_drag_ex(
         shell_error("CIDLData_CreateFromIDArray", e)
     })?;
 
-    // 打上 Preferred DropEffect（复制/剪切语义）。
-    if let Err(e) = set_preferred_drop_effect(&data, preferred) {
-        for q in &pidls {
-            // SAFETY: 归本函数所有。
-            unsafe { free_pidl(*q) };
+    // Preferred DropEffect 预写（P1.2：正常拖出传 None——原版源端不预写，
+    // 效应由目标端决议；仅兼容包装 begin_drag 仍传单值）。
+    if let Some(pref) = preferred {
+        if let Err(e) = set_preferred_drop_effect(&data, pref) {
+            for q in &pidls {
+                // SAFETY: 归本函数所有。
+                unsafe { free_pidl(*q) };
+            }
+            return Err(e);
         }
-        return Err(e);
     }
 
     // 批次B/B2：附加 CF_HDROP（DROPFILES：20 字节头 + 双 NUL 宽串数组），
@@ -695,9 +704,11 @@ pub fn take_dropped() -> Vec<DroppedPaths> {
     DROP_QUEUE.with(|q| std::mem::take(&mut *q.borrow_mut()))
 }
 
-/// 按键 → 拖放效果决议（纯函数）：
+/// 按键 → 拖放效果决议（纯函数；目标端调用——DragOver/Drop 的 grfKeyState）：
 /// Ctrl→COPY；Shift→MOVE；默认取 preferred（数据对象带的
-/// CFSTR_PREFERREDDROPEFFECT；无则 MOVE——Q-Dir 窗格间默认移动）。
+/// CFSTR_PREFERREDDROPEFFECT；**无则 MOVE**——Q-Dir 窗格间无键默认移动
+/// 惯例 *待实测复核*；拖到 Explorer 时 Explorer 按同盘移动/跨盘复制
+/// 自行决议，不看本函数）。
 /// 结果与 `allowed` 取交（allowed=0 视为不限制）。
 pub fn resolve_drop_effect(allowed: u32, key_state: u32, preferred: Option<u32>) -> u32 {
     let want = if key_state & MK_CONTROL_VALUE != 0 {
@@ -1244,8 +1255,8 @@ mod tests {
         let r = begin_drag_ex(
             HostWindow::from_raw_hwnd(0),
             &[],
-            DROPEFFECT_COPY_VALUE | DROPEFFECT_MOVE_VALUE,
-            DROPEFFECT_MOVE_VALUE,
+            DROPEFFECT_COPY_VALUE | DROPEFFECT_MOVE_VALUE | DROPEFFECT_LINK_VALUE,
+            None,
         );
         assert_eq!(r.expect("空列表不应触达 COM"), DragOutcome::None);
     }
@@ -1256,7 +1267,7 @@ mod tests {
             HostWindow::from_raw_hwnd(0),
             &[PathBuf::from("C:\u{0}bad")],
             DROPEFFECT_COPY_VALUE | DROPEFFECT_MOVE_VALUE,
-            DROPEFFECT_COPY_VALUE,
+            Some(DROPEFFECT_COPY_VALUE),
         );
         assert!(r.is_err());
     }

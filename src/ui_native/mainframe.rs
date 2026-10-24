@@ -73,6 +73,20 @@ pub enum KbAction {
     SelectAll,
     Delete,
     NewTab,
+    /// P1.1：撤消 删除（Ctrl+Z）——回收站定位还原上一个删除批次。
+    UndoDelete,
+    /// 本批（2026-10-24）：重复标签页（Ctrl+K，menu_texts:40；复制当前
+    /// 标签路径为新标签）。
+    DuplicateTab,
+    /// 本批：反选（菜单 EDIT_SELECT_INVERT；Ctrl+Shift+A 文案提示，
+    /// 键盘保持局部 *待实测*）。
+    SelectInvert,
+    /// 本批：在新标签页中打开选择（menu_texts:42；Shift+Enter /
+    /// Shift+Ctrl+T——每个选中目录各开一签）。
+    OpenSelNewTab,
+    /// 本批：选择性粘贴（Ctrl+Shift+V，menu_texts:43；对话框选条目与
+    /// 冲突策略后执行）。
+    PasteSpecial,
 }
 
 /// 主窗口类名（自有，见 PRODUCT_SPEC R1）。
@@ -156,7 +170,7 @@ pub(crate) fn column_meta(key: &str) -> (&'static str, i32) {
     }
 }
 
-/// 列菜单项顺序（与 ColumnConfig 默认 columns 同序；id = 30040 + i）。
+/// 列菜单项顺序（与 ColumnConfig 默认 columns 同序；id = COL_BASE(30110) + i）。
 pub(crate) const COLUMN_KEYS: &[&str] = &["Name", "Ext", "Size", "Modified", "Attr"];
 
 /// 可见列按 order 排序（批次D/D3 纯函数）：过滤 visible + 稳定排序
@@ -306,7 +320,7 @@ pub struct PendingFrame {
 impl PendingFrame {
     pub fn new(
         config: Config,
-        session: SessionState,
+        mut session: SessionState,
         hinstance: HINSTANCE,
         ini_path: std::path::PathBuf,
     ) -> Self {
@@ -407,15 +421,35 @@ pub struct MainFrame {
     preview_mode: [u8; 4],
     /// 系统小图标 ImageList 里的文件夹图标索引（首建树时解析一次）。
     folder_image: i32,
+    /// P1.1：撤销删除批次栈（新批次压尾，Ctrl+Z 弹尾；上限 UNDO_STACK_LIMIT）。
+    undo_deletes: Vec<crate::shell::DeleteBatch>,
+    /// P2 全屏：进入前保存的 WINDOWPLACEMENT + GWL_STYLE（None=非全屏）。
+    fullscreen_saved: Option<(windows::Win32::UI::WindowsAndMessaging::WINDOWPLACEMENT, isize)>,
 }
 
 impl MainFrame {
     pub fn new(
         config: Config,
-        session: SessionState,
+        mut session: SessionState,
         _hinstance: HINSTANCE,
         ini_path: std::path::PathBuf,
     ) -> Self {
+        // P2.6：原版 ini Column_* blob 导入投影（icon_size/folder_flags/
+        // group）。view_mode 不动——.qdr 的 ViewMode 优先 *待复核*。
+        for i in 0..4 {
+            if let Some(cv) = &config.column_views[i] {
+                session.panes[i].columns.image_size = cv.icon_size;
+                session.panes[i].columns.folder_flags = cv.folder_flags;
+                session.panes[i].columns.group = cv.group;
+                println!(
+                    "[qdir-rs] ini 导入 窗格{} 视图状态 IconSize={} FFlags={:#x} Group={}",
+                    i + 1,
+                    cv.icon_size,
+                    cv.folder_flags,
+                    cv.group as u32
+                );
+            }
+        }
         MainFrame {
             config,
             session,
@@ -437,6 +471,8 @@ impl MainFrame {
             pane_filter: Default::default(),
             preview_mode: [2; 4],
             folder_image: -1,
+            undo_deletes: Vec::new(),
+            fullscreen_saved: None,
         }
     }
 
@@ -501,6 +537,37 @@ impl MainFrame {
             WM_INITMENUPOPUP => {
                 // 批次D/D3：菜单弹出前按活动窗格刷新「列」子项勾选态。
                 if let Some(frame) = Self::frame_of(hwnd) {
+                    // P2（copy_cut_paste_mode 接线）：复制/剪切模式互斥勾选
+                    // （原版 AF:76335/76347：0x8568 在 mode==0 时勾、0x8569
+                    // 在 mode==1 时勾）。
+                    let mode = frame.config.file_ops.copy_cut_paste_mode;
+                    let menu = HMENU(lp.0 as *mut core::ffi::c_void);
+                    for (id, want) in [
+                        (crate::ui_native::menu::cmd_id::CC_MODE_COPY, mode == 0),
+                        (crate::ui_native::menu::cmd_id::CC_MODE_CUT, mode == 1),
+                    ] {
+                        let st = if want { MF_CHECKED.0 } else { MF_UNCHECKED.0 };
+                        unsafe { CheckMenuItem(menu, id, MF_BYCOMMAND.0 | st) };
+                    }
+                    // P2：排序方式子菜单勾选（键+方向，按活动窗格当前标签页）。
+                    if let Some(pane) = frame.session.panes.get(
+                        (frame.session.focus.number().saturating_sub(1)) as usize,
+                    ) {
+                        if let Some(tab) = pane.tabs.get(pane.tabs_pos) {
+                            for (id, want) in [
+                                (crate::ui_native::menu::cmd_id::SORT_BASE, tab.sort_key == crate::core::SortKey::Name),
+                                (crate::ui_native::menu::cmd_id::SORT_BASE + 1, tab.sort_key == crate::core::SortKey::Ext),
+                                (crate::ui_native::menu::cmd_id::SORT_BASE + 2, tab.sort_key == crate::core::SortKey::Size),
+                                (crate::ui_native::menu::cmd_id::SORT_BASE + 3, tab.sort_key == crate::core::SortKey::Modified),
+                                (crate::ui_native::menu::cmd_id::SORT_BASE + 4, tab.sort_key == crate::core::SortKey::Type),
+                                (crate::ui_native::menu::cmd_id::SORT_ASC, tab.sort_dir == crate::core::SortDir::Asc),
+                                (crate::ui_native::menu::cmd_id::SORT_DESC, tab.sort_dir == crate::core::SortDir::Desc),
+                            ] {
+                                let st = if want { MF_CHECKED.0 } else { MF_UNCHECKED.0 };
+                                unsafe { CheckMenuItem(menu, id, MF_BYCOMMAND.0 | st) };
+                            }
+                        }
+                    }
                     let pidx = frame
                         .session
                         .focus
@@ -899,6 +966,57 @@ impl MainFrame {
         // 新建文件夹(唯一名落盘) / 新建标签页(tab 计数+1) / Del 进回收站(源消失)。
         if std::env::var("QDIR_TEST_OPS").is_ok() {
             unsafe { frame.ops_probe(hwnd) };
+        }
+        // P1.1 撤销删除钩子：QDIR_TEST_UNDO=1 → 临时目录(文件+子目录) →
+        // 全链 Del 进回收站 → 全链 Ctrl+Z 还原并断言内容 → 二次 Ctrl+Z 空栈拒绝。
+        if std::env::var("QDIR_TEST_UNDO").is_ok() {
+            unsafe { frame.undo_probe(hwnd) };
+        }
+        // P2.7 视图模式钩子：QDIR_TEST_VIEWPANE=1 → 命令只作用活动窗格 +
+        // tab.view_mode 记录/恢复（A.5）。
+        if std::env::var("QDIR_TEST_VIEWPANE").is_ok() {
+            unsafe { frame.viewpane_probe(hwnd) };
+        }
+        // P2.9 窗口排列钩子：QDIR_TEST_ARRANGE=1 → 单窗层叠/平铺实测 +
+        // 排列图标（多窗布局由 arrange_rects 单测覆盖）。
+        if std::env::var("QDIR_TEST_ARRANGE").is_ok() {
+            unsafe { frame.arrange_probe(hwnd) };
+        }
+        // P2.5 分组视图钩子：QDIR_TEST_GROUP=1 → Ext/Type/关 三档实测。
+        if std::env::var("QDIR_TEST_GROUP").is_ok() {
+            unsafe { frame.group_probe(hwnd) };
+        }
+        // P2 复制/剪切模式钩子：QDIR_TEST_CCMODE=1 → mode 双档 + ini 落盘。
+        if std::env::var("QDIR_TEST_CCMODE").is_ok() {
+            unsafe { frame.ccmode_probe(hwnd) };
+        }
+        // P2.10 历史下拉钩子：QDIR_TEST_HISTMENU=1 → 显示序 + 绝对跳转。
+        if std::env::var("QDIR_TEST_HISTMENU").is_ok() {
+            unsafe { frame.histmenu_probe(hwnd) };
+        }
+        // P2 排序方式钩子：QDIR_TEST_SORT=1 → 键/方向切换重排。
+        if std::env::var("QDIR_TEST_SORT").is_ok() {
+            unsafe { frame.sort_probe(hwnd) };
+        }
+        // P2 全屏钩子：QDIR_TEST_FULLSCR=1 → 样式/显示器矩形断言。
+        if std::env::var("QDIR_TEST_FULLSCR").is_ok() {
+            unsafe { frame.fullscr_probe(hwnd) };
+        }
+        // P2 标签空白新建钩子：QDIR_TEST_TABNEW=1 → 双击+1/单击不变。
+        if std::env::var("QDIR_TEST_TABNEW").is_ok() {
+            unsafe { frame.tabnew_probe(hwnd) };
+        }
+        // P2 audit #12 标签右键菜单钩子：QDIR_TEST_TABMENU=1。
+        if std::env::var("QDIR_TEST_TABMENU").is_ok() {
+            unsafe { frame.tabmenu_probe(hwnd) };
+        }
+        // P2 audit #22 选择性粘贴钩子：QDIR_TEST_PASTESPECIAL=1。
+        if std::env::var("QDIR_TEST_PASTESPECIAL").is_ok() {
+            unsafe { frame.pastespecial_probe(hwnd) };
+        }
+        // P2 audit #45 数据大小信息钩子：QDIR_TEST_SIZEINFO=1。
+        if std::env::var("QDIR_TEST_SIZEINFO").is_ok() {
+            unsafe { frame.sizeinfo_probe(hwnd) };
         }
         // 批次A/A1 剪切粘贴钩子：QDIR_TEST_CLIP=1 → 临时 src 建文件，Ctrl+X
         // 剪切(cut=true)，导航到 dst，Ctrl+V 粘贴，断言文件移动到 dst。
@@ -1412,16 +1530,28 @@ impl MainFrame {
     }
 
     /// 全部窗格列表切换查看模式（LVM_SETVIEW，comctl v6）。
-    /// id 33931 大图标 / 33932 小图标 / 33933 列表 / 33934 详细信息
+    /// P2.7：视图模式命令作用于**活动窗格**（NATIVE_SPEC A.5：原版
+    /// FUN_004d0370 按 id 给活动窗格内容窗发 0x7029–0x702C *待复核*）。
+    /// 写当前标签页 `view_mode`（.qdr 持久化）+ 只对该窗格列表发
+    /// LVM_SETVIEW；视图随 fill_pane/切标签页恢复。
+    /// 原版 id 33931 大图标 / 33932 小图标 / 33933 列表 / 33934 详细信息
     /// （德语菜单模板 #216 字面文本 &Große Symbole/&Kleine Symbole/
     /// &Liste/&Details 为硬证据；33931/33932 与 LV_VIEW_ICON/SMALLICON
     /// 的对应按语义推断，*待复核*）。
-    pub fn set_view_mode_all(&self, mode: u32) {
-        for p in &self.panes {
-            if let Some(lv) = p.list {
-                unsafe {
-                    let _ = SendMessageW(lv, LVM_SETVIEW, Some(WPARAM(mode as usize)), None);
-                }
+    pub fn set_view_mode_active(&mut self, mode: u32) {
+        let pidx = (self.session.focus.number() - 1) as usize;
+        if pidx >= 4 {
+            return;
+        }
+        if let Some(tab) = self.session.panes[pidx]
+            .tabs
+            .get_mut(self.session.panes[pidx].tabs_pos)
+        {
+            tab.view_mode = crate::core::ViewMode::from_u32(mode);
+        }
+        if let Some(lv) = self.panes[pidx].list {
+            unsafe {
+                let _ = SendMessageW(lv, LVM_SETVIEW, Some(WPARAM(mode as usize)), None);
             }
         }
     }
@@ -1699,6 +1829,8 @@ impl MainFrame {
         };
         let path = tab.path.clone();
         let (sort_key, sort_dir) = (tab.sort_key, tab.sort_dir);
+        // P2.7：该标签页视图模式（None=默认详情；.qdr/切页恢复随 fill 生效）。
+        let view_u32 = tab.view_mode.map(|v| v.to_u32()).unwrap_or(1);
 
         let opts = EnumOptions {
             // 批次C/C1：隐藏/系统文件显示开关（config.show_hidden；默认 true）。
@@ -1733,6 +1865,10 @@ impl MainFrame {
                 // （PaneState.columns 是 per-pane 列配置）。
                 let cols = visible_ordered_columns(&self.session.panes[index].columns);
                 unsafe { populate_list(hwnd, &mut self.icons, &sorted, &cols) };
+                // P2.7：视图模式跟标签页走（切页/.qdr 载入后恢复正确视图）。
+                unsafe { let _ = SendMessageW(hwnd, LVM_SETVIEW, Some(WPARAM(view_u32 as usize)), None); }
+                // P2.5：分组视图随填充应用（组序=行序首现）。
+                unsafe { self.apply_group_view(index) };
                 unsafe { populate_pane_chrome(self, index, &path, sorted.len()) };
                 // 行序→路径映射：命令分发按选中行号取路径。
                 self.panes[index].row_paths =
@@ -2079,6 +2215,106 @@ impl MainFrame {
         }
     }
 
+    /// P2.10：跳转到历史绝对位置（历史下拉选择）。镜像 back/forward 的
+    /// 「history_pos + path 同步」语义；越界或原位返回 false。
+    pub fn go_history_to(&mut self, pidx: usize, pos: usize) -> bool {
+        let tabs_pos = self.session.panes[pidx].tabs_pos;
+        let tab = &mut self.session.panes[pidx].tabs[tabs_pos];
+        if pos >= tab.history.len() || pos == tab.history_pos {
+            return false;
+        }
+        tab.history_pos = pos;
+        tab.path = tab.history[pos].clone();
+        let path = tab.path.clone();
+        unsafe { self.fill_pane(pidx) };
+        println!("[qdir-rs] TEST 历史跳转 窗格{} -> {path:?} (pos={pos})", pidx + 1);
+        true
+    }
+
+    /// P2：排序方式命令（活动窗格当前标签页；menu_texts:75 确证入口）。
+    /// key/dir 各自可选（只换键或只换向）；写 TabState（.qdr 持久化位）
+    /// 后 fill_pane 重排重灌。
+    pub fn set_sort_active(
+        &mut self,
+        key: Option<crate::core::SortKey>,
+        dir: Option<crate::core::SortDir>,
+    ) {
+        let pidx = (self.session.focus.number().saturating_sub(1)) as usize;
+        if pidx >= 4 {
+            return;
+        }
+        let tabs_pos = self.session.panes[pidx].tabs_pos;
+        {
+            let tab = &mut self.session.panes[pidx].tabs[tabs_pos];
+            if let Some(k) = key {
+                tab.sort_key = k;
+            }
+            if let Some(d) = dir {
+                tab.sort_dir = d;
+            }
+        }
+        unsafe { self.fill_pane(pidx) };
+    }
+
+    /// P2：全屏切换（F11；menu_texts:73 确证入口）。进入=去边框
+    /// （WS_OVERLAPPEDWINDOW→WS_POPUP）+ 铺满最近显示器；退出=还原
+    /// WINDOWPLACEMENT 与样式。返回进入后的全屏态。
+    pub unsafe fn toggle_fullscreen(&mut self, main: HWND) -> bool {
+        use windows::Win32::Graphics::Gdi::{
+            GetMonitorInfoW, MonitorFromWindow, MONITORINFO, MONITOR_DEFAULTTONEAREST,
+        };
+        use windows::Win32::UI::WindowsAndMessaging::{
+            GetWindowPlacement, GetWindowLongPtrW, SetWindowLongPtrW, SetWindowPlacement,
+            GWL_STYLE, HWND_TOP, SWP_FRAMECHANGED, SWP_NOOWNERZORDER,
+            SWP_NOZORDER, SET_WINDOW_POS_FLAGS, WINDOWPLACEMENT, WS_OVERLAPPEDWINDOW, WS_POPUP,
+        };
+        unsafe {
+            if let Some((placement, style)) = self.fullscreen_saved.take() {
+                // 退出全屏：还原样式与窗口位置。
+                SetWindowLongPtrW(main, GWL_STYLE, style);
+                let _ = SetWindowPlacement(main, &placement);
+                let _ = SetWindowPos(
+                    main,
+                    None,
+                    0,
+                    0,
+                    0,
+                    0,
+                    SET_WINDOW_POS_FLAGS(
+                        SWP_NOMOVE.0 | SWP_NOSIZE.0 | SWP_NOZORDER.0 | SWP_FRAMECHANGED.0,
+                    ),
+                );
+                println!("[qdir-rs] TEST 全屏 退出（已还原 placement/样式）");
+                return false;
+            }
+            // 进入全屏：保存 placement + 样式 → 去边框 → 铺满显示器。
+            let mut placement = WINDOWPLACEMENT::default();
+            placement.length = std::mem::size_of::<WINDOWPLACEMENT>() as u32;
+            let _ = GetWindowPlacement(main, &mut placement);
+            let style = GetWindowLongPtrW(main, GWL_STYLE);
+            self.fullscreen_saved = Some((placement, style));
+            let mut mi = MONITORINFO::default();
+            mi.cbSize = std::mem::size_of::<MONITORINFO>() as u32;
+            let _ = GetMonitorInfoW(MonitorFromWindow(main, MONITOR_DEFAULTTONEAREST), &mut mi);
+            let _ = SetWindowLongPtrW(
+                main,
+                GWL_STYLE,
+                (style & !(WS_OVERLAPPEDWINDOW.0 as isize)) | WS_POPUP.0 as isize,
+            );
+            let _ = SetWindowPos(
+                main,
+                Some(HWND_TOP),
+                mi.rcMonitor.left,
+                mi.rcMonitor.top,
+                mi.rcMonitor.right - mi.rcMonitor.left,
+                mi.rcMonitor.bottom - mi.rcMonitor.top,
+                SET_WINDOW_POS_FLAGS(SWP_NOOWNERZORDER.0 | SWP_FRAMECHANGED.0),
+            );
+            println!("[qdir-rs] TEST 全屏 进入（样式去 WS_OVERLAPPEDWINDOW）");
+            true
+        }
+    }
+
     /// 批次D/D3：切换某窗格某列的可见性（菜单「查看→列」子项）→ 重灌。
     /// 返回切换后的可见态；未知 key 返回 None。
     /// 注意：列配置在 **PaneState.columns**（per-pane），不在 TabState。
@@ -2400,7 +2636,15 @@ impl MainFrame {
                 if sel.is_empty() {
                     return false;
                 }
-                match crate::shell::copy_to_clipboard(host, &sel) {
+                // P2（copy_cut_paste_mode 接线）：mode=1 时复制键=剪切
+                // （原版 AF:108064：mode≠0 时复制命令后以 Preferred=MOVE
+                // 重包剪贴板数据——等价 cut_to_clipboard）。
+                let r = if self.config.file_ops.copy_cut_paste_mode == 1 {
+                    crate::shell::cut_to_clipboard(host, &sel)
+                } else {
+                    crate::shell::copy_to_clipboard(host, &sel)
+                };
+                match r {
                     Ok(()) => true,
                     Err(e) => {
                         eprintln!("[qdir-rs] 键盘复制失败：{e}");
@@ -2444,28 +2688,372 @@ impl MainFrame {
                 if sel.is_empty() {
                     return false;
                 }
-                // A2：删除默认进回收站（allow_undo=true）。
-                let opts = crate::shell::FileOpOptions {
-                    allow_undo: true,
-                    ..Default::default()
-                };
-                match crate::shell::delete_files(host, &sel, &opts) {
-                    Ok(_) => {
-                        unsafe { self.fill_pane(pidx) };
-                        true
-                    }
-                    Err(e) => {
-                        eprintln!("[qdir-rs] 键盘删除失败：{e}");
-                        false
-                    }
-                }
+                self.delete_selection_with_undo(pidx, &sel, main)
             }
             KbAction::NewTab => {
                 let path = self.pane_path(pidx);
                 unsafe { self.pane_add_tab(pidx, path) };
                 true
             }
+            // 本批（2026-10-24）：重复标签页=当前路径再开一签（menu_texts:40
+            // 「重复标签页 Ctrl+K」；与新建标签同实现、不同入口语义）。
+            KbAction::DuplicateTab => {
+                let path = self.pane_path(pidx);
+                unsafe { self.pane_add_tab(pidx, path) };
+                true
+            }
+            KbAction::SelectInvert => {
+                let n = unsafe { self.invert_selection(pidx) };
+                n > 0
+            }
+            KbAction::OpenSelNewTab => {
+                let sel = sel.clone();
+                if sel.is_empty() {
+                    return false;
+                }
+                let dirs: Vec<_> = sel.into_iter().filter(|p| p.is_dir()).collect();
+                if dirs.is_empty() {
+                    return false;
+                }
+                for d in dirs {
+                    unsafe { self.pane_add_tab(pidx, d) };
+                }
+                true
+            }
+            KbAction::PasteSpecial => unsafe { self.paste_special(pidx, main) },
+            KbAction::UndoDelete => self.undo_last_delete(main),
         }
+    }
+
+    /// 反选（KbAction::SelectInvert）：逐行读 LVIS_SELECTED 取反。
+    /// 返回反选后选中的行数。菜单 EDIT_SELECT_INVERT 同路。
+    pub unsafe fn invert_selection(&mut self, pidx: usize) -> usize {
+        let Some(list) = self.panes[pidx].list else {
+            return 0;
+        };
+        let count = SendMessageW(list, LVM_GETITEMCOUNT, Some(WPARAM(0)), Some(LPARAM(0))).0;
+        if count <= 0 {
+            return 0;
+        }
+        for i in 0..count {
+            let sel = SendMessageW(
+                list,
+                LVM_GETITEMSTATE,
+                Some(WPARAM(i as usize)),
+                Some(LPARAM(LVIS_SELECTED.0 as isize)),
+            )
+            .0
+                & (LVIS_SELECTED.0 as isize)
+                != 0;
+            let st = LVITEMW {
+                state: LIST_VIEW_ITEM_STATE_FLAGS(if sel { 0 } else { LVIS_SELECTED.0 }),
+                stateMask: LIST_VIEW_ITEM_STATE_FLAGS(LVIS_SELECTED.0),
+                ..Default::default()
+            };
+            SendMessageW(
+                list,
+                LVM_SETITEMSTATE,
+                Some(WPARAM(i as usize)),
+                Some(LPARAM(&st as *const LVITEMW as isize)),
+            );
+        }
+        let n = SendMessageW(
+            list,
+            LVM_GETSELECTEDCOUNT,
+            Some(WPARAM(0)),
+            Some(LPARAM(0)),
+        )
+        .0;
+        n.max(0) as usize
+    }
+
+    /// 标签右键弹层（P2 audit #12；`tab_use_context_menu` 开关在调用方）。
+    /// 先把命中标签置为当前（原版惯例 *待复核*），TrackPopupMenu
+    /// TPM_RETURNCMD 本地分发（不进 dispatch）。screen=屏幕坐标。
+    pub unsafe fn show_tab_menu(&mut self, main: HWND, pidx: usize, tab_idx: usize, screen: POINT) {
+        use crate::ui_native::menu::cmd_id;
+        if tab_idx >= self.session.panes[pidx].tabs.len() {
+            return;
+        }
+        unsafe { self.tab_select(pidx, tab_idx) };
+        let m = match crate::ui_native::menu::build_tab_menu() {
+            Ok(m) => m,
+            Err(_) => return,
+        };
+        // 钩子模式（QDIR_TEST_TABMENU）：TrackPopupMenu 阻塞等输入，无法
+        // 无头自动化——改打日志并顺序执行四个动作（同一 tab_menu_action
+        // 分发；弹层 UI 本体 *待实测*，同 HISTMENU 先例）。
+        if std::env::var("QDIR_TEST_TABMENU").is_ok() {
+            println!("[qdir-rs] TEST TABMENU 钩子模式：跳过弹层，顺序执行动作");
+            let _ = DestroyMenu(m);
+            use crate::ui_native::menu::cmd_id as cid;
+            unsafe { self.tab_menu_action(main, cid::TABMENU_NEW, pidx, tab_idx) };
+            unsafe { self.tab_menu_action(main, cid::TABMENU_DUP, pidx, tab_idx) };
+            unsafe { self.tab_menu_action(main, cid::TABMENU_CLOSE, pidx, tab_idx) };
+            unsafe { self.tab_menu_action(main, cid::TABMENU_CLOSE_OTHERS, pidx, tab_idx) };
+            return;
+        }
+        let _ = SetForegroundWindow(main);
+        let cmd = TrackPopupMenu(
+            m,
+            TPM_RETURNCMD | TPM_LEFTALIGN | TPM_TOPALIGN,
+            screen.x,
+            screen.y,
+            None,
+            main,
+            None,
+        );
+        let _ = DestroyMenu(m);
+        unsafe { self.tab_menu_action(main, cmd.0 as u32, pidx, tab_idx) };
+    }
+
+    /// 标签弹层动作分发（show_tab_menu 的本地命令处理；弹层 id → 行为）。
+    /// 未知 id 忽略。**注意**：此函数可能重灌窗格/重建标签，调用方不得
+    /// 在迭代 tabs 期间调用。
+    unsafe fn tab_menu_action(&mut self, main: HWND, id: u32, pidx: usize, tab_idx: usize) {
+        use crate::ui_native::menu::cmd_id;
+        let _ = main;
+        match id {
+            cmd_id::TABMENU_NEW => {
+                let path = self.pane_path(pidx);
+                unsafe { self.pane_add_tab(pidx, path) };
+                println!(
+                    "[qdir-rs] TEST 标签右键 新建 窗格{} len={}",
+                    pidx + 1,
+                    self.session.panes[pidx].tabs.len()
+                );
+            }
+            cmd_id::TABMENU_DUP => {
+                // 重复=当前标签路径再开一签（tab_select 已把目标置当前）。
+                let pos = self.session.panes[pidx]
+                    .tabs_pos
+                    .min(self.session.panes[pidx].tabs.len().saturating_sub(1));
+                let path = self.session.panes[pidx].tabs[pos].path.clone();
+                unsafe { self.pane_add_tab(pidx, path) };
+                println!(
+                    "[qdir-rs] TEST 标签右键 重复 窗格{} len={}",
+                    pidx + 1,
+                    self.session.panes[pidx].tabs.len()
+                );
+            }
+            cmd_id::TABMENU_CLOSE => {
+                let r = unsafe { self.close_tab(pidx, tab_idx) };
+                println!(
+                    "[qdir-rs] TEST 标签右键 关闭 窗格{} 标签{} -> {}",
+                    pidx + 1,
+                    tab_idx,
+                    r.is_ok()
+                );
+            }
+            cmd_id::TABMENU_CLOSE_OTHERS => {
+                // 从尾向头逐个关（跳过目标）；close_tab 拒绝最后一个。
+                let mut i = self.session.panes[pidx].tabs.len();
+                while i > 0 {
+                    i -= 1;
+                    if i == tab_idx {
+                        continue;
+                    }
+                    let _ = unsafe { self.close_tab(pidx, i) };
+                }
+                println!(
+                    "[qdir-rs] TEST 标签右键 关闭其他 窗格{} 剩 {} 签",
+                    pidx + 1,
+                    self.session.panes[pidx].tabs.len()
+                );
+            }
+            _ => {}
+        }
+    }
+
+    /// 选择性粘贴（P2 audit #22）：对话框（paste_dialog）选条目与冲突
+    /// 策略 → shell::plan_paste_special → copy/move_files → 重灌。
+    /// 返回是否执行了粘贴（取消/空剪贴板=false）。
+    pub unsafe fn paste_special(&mut self, pidx: usize, main: HWND) -> bool {
+        let Ok(content) = crate::shell::get_clipboard() else {
+            println!("[qdir-rs] TEST 选择性粘贴 剪贴板无文件");
+            return false;
+        };
+        if content.is_empty() {
+            return false;
+        }
+        let dest = self.pane_path(pidx);
+        if dest.as_os_str().is_empty() {
+            return false;
+        }
+        let names: Vec<String> = content
+            .paths
+            .iter()
+            .map(|p| {
+                p.file_name()
+                    .map(|n| n.to_string_lossy().to_string())
+                    .unwrap_or_else(|| p.display().to_string())
+            })
+            .collect();
+        let Some((checked, strategy)) =
+            (unsafe { crate::ui_native::paste_dialog::run_paste_special(main, &names) })
+        else {
+            println!("[qdir-rs] TEST 选择性粘贴 用户取消");
+            return false;
+        };
+        // 对话框无法无头自动化 *待实测*；执行链独立成 paste_special_exec
+        // 供钩子直测（同 HISTMENU 先例）。
+        unsafe { self.paste_special_exec(pidx, main, content.paths.clone(), &checked, strategy, content.cut) }
+    }
+
+    /// 选择性粘贴执行链（paste_special 的对话框后半段；钩子直测入口）。
+    /// 返回是否执行了粘贴。
+    pub unsafe fn paste_special_exec(
+        &mut self,
+        pidx: usize,
+        main: HWND,
+        paths: Vec<std::path::PathBuf>,
+        checked: &[bool],
+        strategy: crate::shell::PasteStrategy,
+        cut: bool,
+    ) -> bool {
+        let host = crate::shell::HostWindow::from_raw_hwnd(main.0 as isize);
+        let dest = self.pane_path(pidx);
+        if dest.as_os_str().is_empty() {
+            return false;
+        }
+        let dest_names = crate::shell::dest_names(&dest);
+        let Ok((sel, opts)) = crate::shell::plan_paste_special(
+            &paths, checked, strategy, &dest_names, cut,
+        ) else {
+            println!("[qdir-rs] TEST 选择性粘贴 无可粘贴项(空选/全跳过)");
+            return false;
+        };
+        let r = if cut {
+            crate::shell::move_files(host, &sel, &dest, &opts)
+        } else {
+            crate::shell::copy_files(host, &sel, &dest, &opts)
+        };
+        match r {
+            Ok(_) => {
+                unsafe { self.fill_pane(pidx) };
+                println!(
+                    "[qdir-rs] TEST 选择性粘贴 完成 {} 项 策略={strategy:?} cut={cut}",
+                    sel.len()
+                );
+                true
+            }
+            Err(e) => {
+                eprintln!("[qdir-rs] 选择性粘贴失败：{e}");
+                false
+            }
+        }
+    }
+
+    /// 数据大小信息（P2 audit #45，F9）：选中项逐行统计，无选中=当前
+    /// 目录整体统计。MessageBox 展示（模态，自设计简化 *待复核*）。
+    pub unsafe fn size_info_text_for(&self, pidx: usize) -> String {
+        let sel = self.selected_paths(pidx);
+        let (items, header) = if sel.is_empty() {
+            let path = self.pane_path(pidx);
+            (
+                vec![(
+                    path.file_name()
+                        .map(|n| n.to_string_lossy().to_string())
+                        .unwrap_or_else(|| path.display().to_string()),
+                    path,
+                )],
+                "当前目录",
+            )
+        } else {
+            let items: Vec<(String, _)> = sel
+                .iter()
+                .map(|p| {
+                    (
+                        p.file_name()
+                            .map(|n| n.to_string_lossy().to_string())
+                            .unwrap_or_else(|| p.display().to_string()),
+                        p.clone(),
+                    )
+                })
+                .collect();
+            (items, "选中项")
+        };
+        crate::shell::info_text(&items, header)
+    }
+
+    /// 数据大小信息对话框（F9；模态 MessageBox，弹窗本体 *待实测*，
+    /// 文本计算独立可测）。
+    pub unsafe fn size_info_dialog(&mut self, pidx: usize, main: HWND) {
+        let text = self.size_info_text_for(pidx);
+        println!("[qdir-rs] TEST 数据大小信息 {text}");
+        let w: Vec<u16> = text.encode_utf16().chain(std::iter::once(0)).collect();
+        let title: Vec<u16> = "数据大小信息"
+            .encode_utf16()
+            .chain(std::iter::once(0))
+            .collect();
+        unsafe {
+            MessageBoxW(Some(main), PCWSTR(w.as_ptr()), PCWSTR(title.as_ptr()), MB_OK);
+        }
+    }
+
+    /// P1.1：删除选中项进回收站并记录撤销批次（统一入口，键盘 Del 与
+    /// 命令按钮 bi=4 共用）。t0 采于删除调用**之前**（shell 打戳在其后）。
+    /// 成功返回 true 并重灌窗格；删除失败/用户中止返回 false（不留批次）。
+    pub fn delete_selection_with_undo(
+        &mut self,
+        pidx: usize,
+        sel: &[std::path::PathBuf],
+        main: HWND,
+    ) -> bool {
+        if sel.is_empty() {
+            return false;
+        }
+        let host = crate::shell::HostWindow::from_raw_hwnd(main.0 as isize);
+        let t0 = crate::shell::now_filetime();
+        let opts = crate::shell::FileOpOptions {
+            allow_undo: true,
+            ..Default::default()
+        };
+        match crate::shell::delete_files(host, sel, &opts) {
+            Ok(_) => {
+                self.undo_deletes
+                    .push(crate::shell::DeleteBatch {
+                        t0_filetime: t0,
+                        paths: sel.to_vec(),
+                        pane: pidx,
+                    });
+                if self.undo_deletes.len() > crate::shell::UNDO_STACK_LIMIT {
+                    self.undo_deletes.remove(0);
+                }
+                unsafe { self.fill_pane(pidx) };
+                true
+            }
+            Err(e) => {
+                eprintln!("[qdir-rs] 删除失败：{e}");
+                false
+            }
+        }
+    }
+
+    /// P1.1：Ctrl+Z 撤消 删除——弹最近批次，从回收站 `$R` 定位还原。
+    /// 恢复数 >0 时重灌发起窗格（其余窗格由 RDC 监视自动刷新）。
+    pub fn undo_last_delete(&mut self, _main: HWND) -> bool {
+        let Some(batch) = self.undo_deletes.pop() else {
+            println!("[qdir-rs] TEST 撤销删除 空栈拒绝");
+            return false;
+        };
+        let report = crate::shell::restore_batch(&batch);
+        let n = batch.paths.len();
+        println!(
+            "[qdir-rs] TEST 撤销删除 窗格{} 恢复 {}/{} 失败 {:?}",
+            batch.pane + 1,
+            report.restored,
+            n,
+            report.failed
+        );
+        if report.restored > 0 {
+            unsafe {
+                self.fill_pane(batch.pane);
+                let _ = self.refresh_status();
+            }
+            return true;
+        }
+        false
     }
 
     /// Ctrl+A 全选：LVM_SETITEMSTATE(-1, stateMask=LVIS_SELECTED) 把所有行置选中。
@@ -2820,6 +3408,784 @@ impl MainFrame {
 
         // 清理（回收站里的待删项交给系统回收站；临时目录整体删）。
         let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    /// 钩子 QDIR_TEST_UNDO（P1.1，DEV_SPEC_UNDO_DELETE §4）：临时目录建
+    /// 1 文件 + 1 子目录（内含文件）→ 多选 → 全链 Del（回收站）→ 断言双
+    /// 消失 → 全链 Ctrl+Z → 断言双还原 + 内容一致 → 再 Ctrl+Z 空栈拒绝 →
+    /// 清理。全程键盘消息走子类化真链（synth_plain_key / synth_ctrl_key）。
+    unsafe fn undo_probe(&mut self, main: HWND) {
+        let dir = std::env::temp_dir().join(format!("qdir-rs-undo-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&dir);
+        std::fs::create_dir_all(&dir).expect("建临时目录失败");
+        let f1 = dir.join("撤销甲.txt");
+        std::fs::write(&f1, "AAA").expect("写测试文件失败");
+        let sub = dir.join("撤销子目录");
+        std::fs::create_dir_all(&sub).expect("建测试子目录失败");
+        let f2 = sub.join("撤销乙.txt");
+        std::fs::write(&f2, "BBB").expect("写子文件失败");
+
+        // 窗格1 导航到临时目录，多选两行（文件 + 子目录）。
+        self.navigate_to(0, dir.clone());
+        let Some(list) = self.panes[0].list else {
+            println!("[qdir-rs] TEST UNDO：无列表句柄");
+            return;
+        };
+        let rows: Vec<usize> = [&f1, &sub]
+            .into_iter()
+            .filter_map(|p| self.panes[0].row_paths.iter().position(|q| q == p))
+            .collect();
+        let st = LVITEMW {
+            mask: LVIF_STATE,
+            state: LIST_VIEW_ITEM_STATE_FLAGS(LVIS_SELECTED.0),
+            stateMask: LIST_VIEW_ITEM_STATE_FLAGS(LVIS_SELECTED.0),
+            ..Default::default()
+        };
+        for r in &rows {
+            let _ = SendMessageW(
+                list,
+                LVM_SETITEMSTATE,
+                Some(WPARAM(*r)),
+                Some(LPARAM(&st as *const LVITEMW as isize)),
+            );
+        }
+        let n_sel = SendMessageW(list, LVM_GETSELECTEDCOUNT, None, None).0;
+        println!(
+            "[qdir-rs] TEST UNDO 多选 {n_sel}/2（行={rows:?}）删除批次待记录"
+        );
+        assert_eq!(n_sel, 2, "多选两行失败（文件+子目录）");
+
+        // ① 全链 Del（无修饰 WM_KEYDOWN）：删除进回收站 + 记录撤销批次。
+        crate::ui_native::subclass::synth_plain_key(
+            list,
+            windows::Win32::UI::Input::KeyboardAndMouse::VK_DELETE.0 as u32,
+        );
+        let gone = !f1.exists() && !f2.exists();
+        println!("[qdir-rs] TEST UNDO ①Del(全链) 源消失={gone}");
+        assert!(gone, "Del 未使源从磁盘消失（进回收站）");
+
+        // ② 全链 Ctrl+Z：回收站定位还原，内容断言。
+        crate::ui_native::subclass::synth_ctrl_key(
+            list,
+            windows::Win32::UI::Input::KeyboardAndMouse::VK_Z.0 as u32,
+        );
+        let back1 = f1.exists() && std::fs::read_to_string(&f1).is_ok_and(|s| s == "AAA");
+        let back2 = f2.exists() && std::fs::read_to_string(&f2).is_ok_and(|s| s == "BBB");
+        println!(
+            "[qdir-rs] TEST UNDO ②Ctrl+Z(全链) 文件还原={back1} 目录还原(含内文件)={back2}"
+        );
+        assert!(back1 && back2, "Ctrl+Z 未还原删除批次");
+
+        // ③ 再按一次：撤销栈空 → 拒绝（undo_last_delete 打印「空栈拒绝」），
+        //    磁盘无变化。
+        crate::ui_native::subclass::synth_ctrl_key(
+            list,
+            windows::Win32::UI::Input::KeyboardAndMouse::VK_Z.0 as u32,
+        );
+        assert!(f1.exists(), "空栈 Ctrl+Z 不应影响磁盘");
+        println!("[qdir-rs] TEST UNDO ③空栈拒绝 ok");
+
+        // 清理（还原后的文件随临时目录整体删除；回收站无残留）。
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    /// 钩子 QDIR_TEST_VIEWPANE（P2.7）：视图模式只作用于活动窗格（A.5）——
+    /// SendMessage WM_COMMAND 30021(大图标)/30023(列表) → 断言活动窗格
+    /// GETVIEW 变、非活动窗格不变、tab.view_mode 记录；新标签页(None)回
+    /// 默认详情、切回原标签页视图恢复；切换活动窗格后命令改作用于新窗格。
+    unsafe fn viewpane_probe(&mut self, main: HWND) {
+        let Some(l0) = self.panes[0].list else {
+            println!("[qdir-rs] TEST VIEWPANE：窗格1 无列表");
+            return;
+        };
+        let Some(l1) = self.panes[1].list else {
+            println!("[qdir-rs] TEST VIEWPANE：窗格2 无列表");
+            return;
+        };
+        let send_cmd = |id: u32| unsafe {
+            let _ = SendMessageW(
+                main,
+                WM_COMMAND,
+                Some(WPARAM(id as usize)),
+                Some(LPARAM(0)),
+            );
+        };
+        let getview = |lv: HWND| -> u32 {
+            unsafe { SendMessageW(lv, LVM_GETVIEW, None, None).0 as u32 }
+        };
+        self.set_active_pane(0);
+        let before1 = getview(l1);
+        // ① 活动窗格1 发大图标：仅窗格1 变 0；窗格2 不变；tab 记录。
+        send_cmd(30021);
+        let v0 = getview(l0);
+        let v1 = getview(l1);
+        let rec = self.session.panes[0].tabs[0].view_mode;
+        println!(
+            "[qdir-rs] TEST VIEWPANE ①30021 窗格1 GETVIEW={v0}(期0) 窗格2 GETVIEW={v1}(期{before1}未变) tab记录={rec:?}"
+        );
+        assert_eq!(v0, 0, "活动窗格未切大图标");
+        assert_eq!(v1, before1, "非活动窗格不应被改");
+        assert_eq!(rec, Some(crate::core::ViewMode::LargeIcon), "view_mode 未记录");
+        // ② 列表模式 → 3。
+        send_cmd(30023);
+        assert_eq!(getview(l0), 3, "列表模式未生效");
+        // ③ 新标签页（view_mode=None）→ fill 后回默认详情 1。
+        let dir = self.pane_path(0);
+        unsafe { self.pane_add_tab(0, dir) };
+        let pos = self.session.panes[0].tabs_pos;
+        let v_new = getview(l0);
+        println!(
+            "[qdir-rs] TEST VIEWPANE ③新标签页 GETVIEW={v_new}(期1) view_mode={:?}",
+            self.session.panes[0].tabs[pos].view_mode
+        );
+        assert_eq!(v_new, 1, "新标签页应回默认详情");
+        // ④ 切回原标签页 → 视图恢复 3。
+        self.session.panes[0].tabs_pos = 0;
+        unsafe { self.fill_pane(0) };
+        assert_eq!(getview(l0), 3, "切回标签页视图未恢复");
+        println!("[qdir-rs] TEST VIEWPANE ④切回标签页 GETVIEW=3 恢复");
+        // ⑤ 活动窗格切到 2 → 命令改作用于窗格2；窗格1 保持 3。
+        assert!(self.set_active_pane(1), "切活动窗格失败");
+        send_cmd(30021);
+        let w0 = getview(l0);
+        let w1 = getview(l1);
+        println!(
+            "[qdir-rs] TEST VIEWPANE ⑤活动窗格2 30021 窗格2 GETVIEW={w1}(期0) 窗格1 GETVIEW={w0}(期3未变)"
+        );
+        assert_eq!(w1, 0, "新活动窗格未切大图标");
+        assert_eq!(w0, 3, "原窗格视图不应被改");
+        println!("[qdir-rs] TEST VIEWPANE 全部通过（测试附加标签页随进程退出丢弃）");
+    }
+
+    /// P2.5：分组依据命令（活动窗格）。key=None 关分组；"Ext"/"Type" 开。
+    /// 状态写 pane.columns（.qdr 视图串 GroupBy/Group 建模早已往返，本项
+    /// 接通消费），应用见 apply_group_view。
+    pub fn set_group_by_active(&mut self, key: Option<&str>) {
+        let pidx = (self.session.focus.number() - 1) as usize;
+        if pidx >= 4 {
+            return;
+        }
+        {
+            let cfg = &mut self.session.panes[pidx].columns;
+            cfg.group_by = key.unwrap_or("").to_string();
+            cfg.group = key.is_some();
+        }
+        unsafe { self.apply_group_view(pidx) };
+    }
+
+    /// 应用该窗格分组视图（fill_pane 尾部与设置分组共用）：关=禁用+清组；
+    /// 开=启用 + 按行序首现建组 + 逐行 iGroupId。
+    pub(crate) unsafe fn apply_group_view(&mut self, pidx: usize) {
+        let Some(lv) = self.panes[pidx].list else {
+            return;
+        };
+        let cfg = self.session.panes[pidx].columns.clone();
+        if !cfg.group_active() {
+            unsafe {
+                let _ = SendMessageW(lv, LVM_ENABLEGROUPVIEW, Some(WPARAM(0)), None);
+                let _ = SendMessageW(lv, LVM_REMOVEALLGROUPS, None, None);
+            }
+            return;
+        }
+        // 行序 = row_paths（与列表行一一对应）。
+        let keys: Vec<String> = self.panes[pidx]
+            .row_paths
+            .iter()
+            .map(|p| match cfg.group_by.as_str() {
+                "Type" => crate::shell::type_name_of(p).unwrap_or_else(|_| "其他".to_string()),
+                _ => crate::core::group_label_ext(
+                    &p.file_name()
+                        .map(|n| n.to_string_lossy().into_owned())
+                        .unwrap_or_default(),
+                ),
+            })
+            .collect();
+        let headers = crate::core::distinct_first(&keys);
+        unsafe { listview_set_groups(lv, &headers, &keys) };
+    }
+
+    /// P2.9：排列图标（活动窗格 LVM_ARRANGE LVA_DEFAULT；仅图标视图有观感，
+    /// 详见 ui_native::arrange）。
+    pub fn arrange_icons_active(&self) -> bool {
+        let pidx = (self.session.focus.number() - 1) as usize;
+        let Some(lv) = self.panes.get(pidx).and_then(|p| p.list) else {
+            return false;
+        };
+        // SAFETY: lv 为本进程 ListView 句柄。
+        unsafe { SendMessageW(lv, LVM_ARRANGE, Some(WPARAM(0)), None).0 != 0 }
+    }
+
+    /// 钩子 QDIR_TEST_ARRANGE（P2.9）：单窗三排列实测（SetWindowPos 真应用，
+    /// 探针先 ShowWindow 使本窗可见再收集）+ 图标视图 LVM_ARRANGE。
+    /// 多窗跨实例行为由 arrange_rects 单测覆盖，真实双窗 *待实测*。
+    unsafe fn arrange_probe(&mut self, main: HWND) {
+        use crate::ui_native::arrange::{ArrangeKind, arrange_rects, arrange_windows, window_rect, work_area};
+        // WM_CREATE 期间主窗尚未 ShowWindow——探针自行置可见（测试专用）。
+        unsafe {
+            let _ = ShowWindow(main, SW_SHOW);
+        }
+        let before = unsafe { window_rect(main) };
+        let wa = unsafe { work_area() };
+        // ① 层叠：单窗 = 工作区 3/4 于 (wa.x, wa.y)。
+        let n1 = unsafe { arrange_windows(ArrangeKind::Cascade) };
+        let after_c = unsafe { window_rect(main) };
+        let want_c = arrange_rects(ArrangeKind::Cascade, wa, 1)[0];
+        println!(
+            "[qdir-rs] TEST ARRANGE ①层叠 n={n1} 前={before:?} 后={after_c:?} 期={want_c:?}"
+        );
+        assert_eq!(n1, 1, "钩子期应只有 1 个同类顶层窗");
+        assert_eq!(after_c, want_c, "层叠布局不符");
+        // ② 横向平铺：单窗 = 满工作区。
+        unsafe { arrange_windows(ArrangeKind::TileHorizontal) };
+        let after_h = unsafe { window_rect(main) };
+        println!("[qdir-rs] TEST ARRANGE ②横向平铺 后={after_h:?} 工作区={wa:?}");
+        assert_eq!(after_h, (wa.0, wa.1, wa.2, wa.3), "横向平铺应满铺");
+        // ③ 纵向平铺：单窗同为满工作区。
+        unsafe { arrange_windows(ArrangeKind::TileVertical) };
+        let after_v = unsafe { window_rect(main) };
+        println!("[qdir-rs] TEST ARRANGE ③纵向平铺 后={after_v:?}");
+        assert_eq!(after_v, (wa.0, wa.1, wa.2, wa.3), "纵向平铺应满铺");
+        // ④ 排列图标：切大图标视图 → LVM_ARRANGE。
+        self.set_view_mode_active(0);
+        let ok = self.arrange_icons_active();
+        println!("[qdir-rs] TEST ARRANGE ④排列图标 -> {ok}");
+        assert!(ok, "LVM_ARRANGE 失败");
+        // 还原启动矩形（测试不遗留几何副作用）。
+        unsafe {
+            let _ = SetWindowPos(
+                main,
+                None,
+                before.0,
+                before.1,
+                before.2,
+                before.3,
+                SET_WINDOW_POS_FLAGS(SWP_NOZORDER.0),
+            );
+        }
+        println!("[qdir-rs] TEST ARRANGE 全部通过（已还原启动矩形）");
+    }
+
+    /// 钩子 QDIR_TEST_GROUP（P2.5）：临时目录 a.txt/b.txt/c.log + 子目录 →
+    /// WM_COMMAND 分组依据 → 断言启用/组数/逐行已归组/columns 记录 →
+    /// Type 分组 → 关分组（禁用+清组）。
+    unsafe fn group_probe(&mut self, main: HWND) {
+        use crate::ui_native::menu::cmd_id;
+        let dir = std::env::temp_dir().join(format!("qdir-rs-group-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&dir);
+        std::fs::create_dir_all(&dir).expect("建临时目录失败");
+        for f in ["a.txt", "b.txt", "c.log"] {
+            std::fs::write(dir.join(f), "x").expect("写测试文件失败");
+        }
+        std::fs::create_dir_all(dir.join("子目录")).expect("建子目录失败");
+        self.navigate_to(0, dir.clone());
+        let Some(lv) = self.panes[0].list else {
+            println!("[qdir-rs] TEST GROUP：无列表");
+            return;
+        };
+        let send = |id: u32| unsafe {
+            let _ = SendMessageW(main, WM_COMMAND, Some(WPARAM(id as usize)), Some(LPARAM(0)));
+        };
+        let gcount = |lv: HWND| -> i32 {
+            unsafe { SendMessageW(lv, LVM_GETGROUPCOUNT, Some(WPARAM(0)), Some(LPARAM(0))).0 as i32 }
+        };
+        let genabled = |lv: HWND| -> i32 {
+            unsafe { SendMessageW(lv, LVM_ISGROUPVIEWENABLED, Some(WPARAM(0)), Some(LPARAM(0))).0 as i32 }
+        };
+        let row_group = |lv: HWND, row: i32| -> i32 {
+            unsafe {
+                let mut it = LVITEMW {
+                    mask: LVIF_GROUPID,
+                    iItem: row,
+                    ..Default::default()
+                };
+                let _ = SendMessageW(
+                    lv,
+                    LVM_GETITEMW,
+                    Some(WPARAM(0)),
+                    Some(LPARAM(&mut it as *mut LVITEMW as isize)),
+                );
+                it.iGroupId
+            }
+        };
+        let n_rows = SendMessageW(lv, LVM_GETITEMCOUNT, None, None).0 as i32;
+        // ① GroupBy=Ext：组 = TXT / LOG / (无扩展名)(目录)。
+        send(cmd_id::GROUP_BASE + 1);
+        let en = genabled(lv);
+        let gc = gcount(lv);
+        let gids: Vec<i32> = (0..n_rows).map(|r| row_group(lv, r)).collect();
+        let rec = self.session.panes[0].columns.group_by.clone();
+        println!(
+            "[qdir-rs] TEST GROUP ①Ext 启用={en} 组数={gc}(期3) 行数={n_rows} 行组={gids:?} 记录={rec:?}"
+        );
+        assert_eq!(en, 1, "组视图未启用");
+        assert_eq!(gc, 3, "Ext 组数应为 3（TXT/LOG/(无扩展名)）");
+        assert!(gids.iter().all(|&g| g >= 1), "存在未归组行");
+        assert_eq!(rec, "Ext", "group_by 未记录");
+        // ② GroupBy=Type：类型名分组，组数≥2。
+        send(cmd_id::GROUP_BASE + 2);
+        let gc2 = gcount(lv);
+        println!("[qdir-rs] TEST GROUP ②Type 组数={gc2}(期≥2)");
+        assert!(gc2 >= 2, "Type 分组未生效");
+        // ③ 关分组：禁用 + 清组。
+        send(cmd_id::GROUP_BASE);
+        let en3 = genabled(lv);
+        let gc3 = gcount(lv);
+        println!("[qdir-rs] TEST GROUP ③关闭 启用={en3} 组数={gc3}");
+        assert_eq!(en3, 0, "组视图未禁用");
+        assert_eq!(gc3, 0, "组未清空");
+        let _ = std::fs::remove_dir_all(&dir);
+        println!("[qdir-rs] TEST GROUP 全部通过");
+    }
+
+    /// 钩子 QDIR_TEST_CCMODE（P2 copy_cut_paste_mode 接线）：mode=0 时
+    /// Ctrl+C → 剪贴板 cut=false；WM_COMMAND 切剪切模式（0x8569 语义）→
+    /// config=1 + Ctrl+C → cut=true；切回复制模式复原。原 ini 模式值快照
+    /// 后恢复（命令臂会真实落 ini）。
+    unsafe fn ccmode_probe(&mut self, main: HWND) {
+        use crate::ui_native::menu::cmd_id;
+        let dir = std::env::temp_dir().join(format!("qdir-rs-ccmode-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&dir);
+        std::fs::create_dir_all(&dir).expect("建临时目录失败");
+        let file = dir.join("复制件.txt");
+        std::fs::write(&file, "M").expect("写测试文件失败");
+        self.navigate_to(0, dir.clone());
+        let Some(list) = self.panes[0].list else {
+            println!("[qdir-rs] TEST CCMODE：无列表");
+            return;
+        };
+        let row = self.panes[0].row_paths.iter().position(|p| *p == file);
+        let Some(r) = row else {
+            println!("[qdir-rs] TEST CCMODE：未找到测试行");
+            return;
+        };
+        let orig_mode = self.config.file_ops.copy_cut_paste_mode;
+        let send = |id: u32| unsafe {
+            let _ = SendMessageW(main, WM_COMMAND, Some(WPARAM(id as usize)), Some(LPARAM(0)));
+        };
+        let ctrl_c = |list: HWND| unsafe {
+            crate::ui_native::subclass::synth_ctrl_key(
+                list,
+                windows::Win32::UI::Input::KeyboardAndMouse::VK_C.0 as u32,
+            )
+        };
+        // ① 复制模式（mode=0）：Ctrl+C → cut=false。
+        self.config.file_ops.copy_cut_paste_mode = 0;
+        unsafe { select_row_if_valid(list, r as i32) };
+        ctrl_c(list);
+        let cut0 = crate::shell::get_clipboard().map(|c| c.cut).unwrap_or(false);
+        // ② 菜单切剪切模式：config=1，Ctrl+C → cut=true。
+        send(cmd_id::CC_MODE_CUT);
+        let mode1 = self.config.file_ops.copy_cut_paste_mode;
+        ctrl_c(list);
+        let cut1 = crate::shell::get_clipboard().map(|c| c.cut).unwrap_or(false);
+        // ③ 切回复制模式复原。
+        send(cmd_id::CC_MODE_COPY);
+        let mode2 = self.config.file_ops.copy_cut_paste_mode;
+        println!(
+            "[qdir-rs] TEST CCMODE ①复制模式 cut={cut0:?}(期false) ②切剪切 config={mode1} cut={cut1:?}(期true) ③复原 config={mode2}(期0)"
+        );
+        assert!(!cut0, "复制模式 Ctrl+C 应为 copy(cut=false)");
+        assert_eq!(mode1, 1, "剪切模式未写入 config");
+        assert!(cut1, "剪切模式 Ctrl+C 应为 cut（AF:108064）");
+        assert_eq!(mode2, 0, "复制模式未复原");
+        // 恢复用户原模式并落盘（探针的两次切换已真实写过 ini）。
+        self.config.file_ops.copy_cut_paste_mode = orig_mode;
+        let _ = crate::config::save_config(&self.ini_path, &self.config);
+        let _ = std::fs::remove_dir_all(&dir);
+        println!("[qdir-rs] TEST CCMODE 全部通过（原模式 {orig_mode} 已恢复）");
+    }
+
+    /// 钩子 QDIR_TEST_HISTMENU（P2.10）：三目录导航 → 纯函数显示序断言
+    /// （当前▶置顶/后退逆序/前进顺序）→ go_history_to 绝对跳转（含越界
+    /// 钩子 QDIR_TEST_SORT（P2）：临时目录 a.txt/b.log/c.txt → 排序方式
+    /// 命令切 Ext/递减 → 断言 row_paths 顺序随键/方向变化 + TabState 记录。
+    unsafe fn sort_probe(&mut self, main: HWND) {
+        use crate::ui_native::menu::cmd_id;
+        let dir = std::env::temp_dir().join(format!("qdir-rs-sort-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&dir);
+        std::fs::create_dir_all(&dir).expect("建临时目录失败");
+        std::fs::write(dir.join("a.txt"), "x").expect("写文件失败");
+        std::fs::write(dir.join("b.log"), "x").expect("写文件失败");
+        std::fs::write(dir.join("c.txt"), "x").expect("写文件失败");
+        self.navigate_to(0, dir.clone());
+        let send = |id: u32| unsafe {
+            let _ = SendMessageW(main, WM_COMMAND, Some(WPARAM(id as usize)), Some(LPARAM(0)));
+        };
+        let names = |f: &Self| -> Vec<String> {
+            f.panes[0]
+                .row_paths
+                .iter()
+                .map(|p| p.file_name().unwrap().to_string_lossy().into_owned())
+                .collect()
+        };
+        let n0 = names(self);
+        // ① 按扩展名递增：b.log 应排最前（log < txt，目录优先除外）。
+        send(cmd_id::SORT_BASE + 1);
+        let n1 = names(self);
+        let key1 = self.session.panes[0].tabs[0].sort_key;
+        println!("[qdir-rs] TEST SORT ①默认={n0:?} → Ext={n1:?} 记录={key1:?}");
+        assert_eq!(key1, crate::core::SortKey::Ext, "sort_key 未记录");
+        assert_eq!(n1.first().map(|s| s.as_str()), Some("b.log"), "Ext 排序未生效");
+        // ② 递减：应反转（b.log 到最后）。
+        send(cmd_id::SORT_DESC);
+        let n2 = names(self);
+        let dir2 = self.session.panes[0].tabs[0].sort_dir;
+        println!("[qdir-rs] TEST SORT ②递减={n2:?} 记录={dir2:?}");
+        assert_eq!(dir2, crate::core::SortDir::Desc, "sort_dir 未记录");
+        assert_ne!(n2, n1, "递减未生效");
+        assert_eq!(n2.last().map(|s| s.as_str()), Some("b.log"), "递减后 b.log 应在末尾");
+        // ③ 回名称递增复原。
+        send(cmd_id::SORT_BASE);
+        send(cmd_id::SORT_ASC);
+        let n3 = names(self);
+        println!("[qdir-rs] TEST SORT ③名称递增={n3:?}");
+        assert_eq!(n3.first().map(|s| s.as_str()), Some("a.txt"), "名称递增未生效");
+        let _ = std::fs::remove_dir_all(&dir);
+        println!("[qdir-rs] TEST SORT 全部通过");
+    }
+
+    /// 钩子 QDIR_TEST_FULLSCR（P2）：WM_COMMAND 全屏切换 → 断言 WS_CAPTION
+    /// 清除 + 客户区铺满显示器 → 再切 → 样式还原。
+    unsafe fn fullscr_probe(&mut self, main: HWND) {
+        use windows::Win32::Graphics::Gdi::{GetMonitorInfoW, MonitorFromWindow, MONITORINFO, MONITOR_DEFAULTTONEAREST};
+        use windows::Win32::UI::WindowsAndMessaging::{GetWindowLongPtrW, GetWindowRect, GWL_STYLE};
+        let style_of = |main: HWND| -> isize {
+            unsafe { GetWindowLongPtrW(main, GWL_STYLE) }
+        };
+        let caption_bit = windows::Win32::UI::WindowsAndMessaging::WS_CAPTION.0 as isize;
+        let before_style = style_of(main);
+        let send = |main: HWND| unsafe {
+            let _ = SendMessageW(
+                main,
+                WM_COMMAND,
+                Some(WPARAM(crate::ui_native::menu::cmd_id::VIEW_FULLSCREEN as usize)),
+                Some(LPARAM(0)),
+            );
+        };
+        // ① 进入全屏。
+        send(main);
+        let in_style = style_of(main);
+        let mut mi = MONITORINFO::default();
+        mi.cbSize = std::mem::size_of::<MONITORINFO>() as u32;
+        unsafe {
+            let _ = GetMonitorInfoW(MonitorFromWindow(main, MONITOR_DEFAULTTONEAREST), &mut mi);
+        }
+        let mut r = windows::Win32::Foundation::RECT::default();
+        unsafe {
+            let _ = GetWindowRect(main, &mut r);
+        }
+        println!(
+            "[qdir-rs] TEST FULLSCR ①进入 caption清除={} rect=({},{},{},{}) 监视器=({},{},{},{})",
+            in_style & caption_bit == 0,
+            r.left, r.top, r.right, r.bottom,
+            mi.rcMonitor.left, mi.rcMonitor.top, mi.rcMonitor.right, mi.rcMonitor.bottom
+        );
+        assert_eq!(in_style & caption_bit, 0, "全屏未清除 WS_CAPTION");
+        assert_eq!(
+            (r.left, r.top, r.right, r.bottom),
+            (mi.rcMonitor.left, mi.rcMonitor.top, mi.rcMonitor.right, mi.rcMonitor.bottom),
+            "全屏未铺满显示器"
+        );
+        // ② 退出还原。
+        send(main);
+        let out_style = style_of(main);
+        let diff = out_style ^ before_style;
+        println!(
+            "[qdir-rs] TEST FULLSCR ②退出 样式还原={} 差异位=0x{diff:X}",
+            out_style == before_style
+        );
+        // 语义断言：边框族（CAPTION/THICKFRAME）恢复、WS_POPUP 清除——
+        // 整体位等价受系统规范化影响（如可见/最小化框位），不锁全等。
+        assert_ne!(out_style & caption_bit, 0, "退出全屏未恢复 WS_CAPTION");
+        assert_eq!(
+            out_style & windows::Win32::UI::WindowsAndMessaging::WS_POPUP.0 as isize,
+            0,
+            "退出全屏仍带 WS_POPUP"
+        );
+        println!("[qdir-rs] TEST FULLSCR 全部通过");
+    }
+
+    /// 钩子 QDIR_TEST_TABNEW（P2 audit #11）：向窗格1 标签控件空白区投递
+    /// WM_LBUTTONDBLCLK（TCM_HITTEST=-1）→ tab_new_tab_l_dblclk=true →
+    /// tab 计数 +1；单击（默认关）不建。
+    unsafe fn tabnew_probe(&mut self, main: HWND) {
+        let Some(tab) = self.panes[0].tab else {
+            println!("[qdir-rs] TEST TABNEW：无标签控件");
+            return;
+        };
+        println!(
+            "[qdir-rs] TEST TABNEW 配置 dblclk={} clk={} 初始 pos={} len={}",
+            self.config.tab.new_tab_l_dblclk,
+            self.config.tab.new_tab_l_clk,
+            self.session.panes[0].tabs_pos,
+            self.session.panes[0].tabs.len()
+        );
+        let before = self.session.panes[0].tabs.len();
+        // 空白区坐标：x=2000 远超任何标签宽度。
+        let lp_empty = LPARAM((2000i32 as isize & 0xFFFF) | ((5i32 as isize) << 16));
+        unsafe {
+            let _ = SendMessageW(
+                tab,
+                WM_LBUTTONDBLCLK,
+                Some(WPARAM(1)),
+                Some(lp_empty),
+            );
+        }
+        let titles_mid: Vec<String> = self.session.panes[0]
+            .tabs
+            .iter()
+            .map(|t| t.title.clone())
+            .collect();
+        let after_dbl = self.session.panes[0].tabs.len();
+        println!("[qdir-rs] TEST TABNEW mid 计数={after_dbl} 标题={titles_mid:?} tabs_pos={}", self.session.panes[0].tabs_pos);
+        unsafe {
+            let _ = SendMessageW(tab, WM_LBUTTONDOWN, Some(WPARAM(1)), Some(lp_empty));
+        }
+        let after_clk = self.session.panes[0].tabs.len();
+        println!(
+            "[qdir-rs] TEST TABNEW 双击空白 {before}->{after_dbl}(期+1) 单击空白(默认关) ->{after_clk}(期不变)"
+        );
+        assert_eq!(after_dbl, before + 1, "空白双击未新建标签页");
+        assert_eq!(after_clk, after_dbl, "单击空白（默认关）不应新建");
+        let _ = main;
+        println!("[qdir-rs] TEST TABNEW 全部通过");
+    }
+
+    /// 钩子 QDIR_TEST_TABMENU（P2 audit #12）：tab_use_context_menu 门 +
+    /// WM_CONTEXTMENU 命中标签0（TCM_GETITEMRECT→ClientToScreen 屏幕坐标）
+    /// → 钩子模式顺序执行四动作（新建/重复/关闭/关闭其他）并断言计数。
+    unsafe fn tabmenu_probe(&mut self, main: HWND) {
+        use windows::Win32::UI::Controls::TCM_GETITEMRECT;
+        use windows::Win32::Graphics::Gdi::ClientToScreen;
+        use windows::Win32::UI::WindowsAndMessaging::WM_CONTEXTMENU;
+        let base = std::env::temp_dir().join(format!("qdir-rs-tm-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&base);
+        let d1 = base.join("层一");
+        std::fs::create_dir_all(&d1).expect("建目录失败");
+        // ① 门（默认开）。
+        println!(
+            "[qdir-rs] TEST TABMENU 门 use_context_menu={}",
+            self.config.tab.use_context_menu
+        );
+        assert!(self.config.tab.use_context_menu, "tab_use_context_menu 默认应开");
+        let l0 = self.session.panes[0].tabs.len();
+        unsafe { self.pane_add_tab(0, d1.clone()) };
+        assert_eq!(self.session.panes[0].tabs.len(), l0 + 1);
+        // ② WM_CONTEXTMENU 命中标签0（屏幕坐标；钩子模式跳过弹层）。
+        let Some(tab) = self.panes[0].tab else {
+            panic!("TABMENU：无标签控件");
+        };
+        let mut rect = windows::Win32::Foundation::RECT::default();
+        let ok = unsafe {
+            SendMessageW(
+                tab,
+                TCM_GETITEMRECT,
+                Some(WPARAM(0)),
+                Some(LPARAM(&mut rect as *mut _ as isize)),
+            )
+        };
+        assert!(ok.0 != 0, "TCM_GETITEMRECT 失败");
+        let mut pt = windows::Win32::Foundation::POINT {
+            x: (rect.left + rect.right) / 2,
+            y: (rect.top + rect.bottom) / 2,
+        };
+        unsafe { let _ = ClientToScreen(tab, &mut pt); }
+        println!("[qdir-rs] TEST TABMENU 命中屏幕坐标=({},{})", pt.x, pt.y);
+        unsafe {
+            SendMessageW(
+                tab,
+                WM_CONTEXTMENU,
+                Some(WPARAM(tab.0 as usize)),
+                Some(LPARAM(((pt.x as isize) & 0xFFFF) | ((pt.y as isize) << 16))),
+            );
+        }
+        // 钩子模式动作序列：新建(+1) 重复(+1) 关闭标签0(-1) 关闭其他(剩1)。
+        let end = self.session.panes[0].tabs.len();
+        println!(
+            "[qdir-rs] TEST TABMENU 动作链终态 len={end} pos={}（期 1）",
+            self.session.panes[0].tabs_pos
+        );
+        assert_eq!(end, 1, "关闭其他后应只剩 1 签");
+        // ③ 门关：不再触发任何动作。
+        self.config.tab.use_context_menu = false;
+        unsafe { self.pane_add_tab(0, d1.clone()) };
+        let l2 = self.session.panes[0].tabs.len();
+        unsafe {
+            SendMessageW(
+                tab,
+                WM_CONTEXTMENU,
+                Some(WPARAM(tab.0 as usize)),
+                Some(LPARAM(((pt.x as isize) & 0xFFFF) | ((pt.y as isize) << 16))),
+            );
+        }
+        assert_eq!(self.session.panes[0].tabs.len(), l2, "门关时不得触发动作");
+        self.config.tab.use_context_menu = true;
+        let _ = main;
+        let _ = std::fs::remove_dir_all(&base);
+        println!("[qdir-rs] TEST TABMENU 全部通过（弹层 UI *待实测*）");
+    }
+
+    /// 钩子 QDIR_TEST_PASTESPECIAL（P2 audit #22）：真实剪贴板链 +
+    /// Skip 策略（同名剔除）+ Rename 策略（冲突改名）+ 空选拒绝。
+    /// 对话框本体无法无头自动化 *待实测*（paste_special→run_paste_special）。
+    unsafe fn pastespecial_probe(&mut self, main: HWND) {
+        let base = std::env::temp_dir().join(format!("qdir-rs-psx-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&base);
+        let src = base.join("src");
+        let dst = base.join("dst");
+        std::fs::create_dir_all(&src).expect("建 src");
+        std::fs::create_dir_all(&dst).expect("建 dst");
+        std::fs::write(src.join("a.txt"), "A").unwrap();
+        std::fs::write(src.join("b.txt"), "BB").unwrap();
+        // ① Skip：目标同名 a.txt 保留原内容，b.txt 粘入（复制语义）。
+        std::fs::write(dst.join("a.txt"), "dst-old").unwrap();
+        let host = crate::shell::HostWindow::from_raw_hwnd(main.0 as isize);
+        let paths = vec![src.join("a.txt"), src.join("b.txt")];
+        crate::shell::copy_to_clipboard(host, &paths).expect("写剪贴板");
+        let content = crate::shell::get_clipboard().expect("读剪贴板");
+        assert_eq!(content.paths.len(), 2, "剪贴板往返条目数");
+        self.navigate_to(0, dst.clone());
+        let done = unsafe {
+            self.paste_special_exec(
+                0, main, content.paths.clone(), &[true, true],
+                crate::shell::PasteStrategy::Skip, content.cut,
+            )
+        };
+        assert!(done, "Skip 粘贴应执行");
+        assert_eq!(
+            std::fs::read_to_string(dst.join("a.txt")).unwrap(),
+            "dst-old",
+            "同名项应被跳过"
+        );
+        assert_eq!(std::fs::read_to_string(dst.join("b.txt")).unwrap(), "BB");
+        assert!(src.join("a.txt").exists(), "复制语义源不消失");
+        println!("[qdir-rs] TEST PASTESPECIAL ①Skip 完成（同名保留、异名粘入）");
+        // ② Rename：dst2 预置 c.txt，粘 c.txt → 原件不动 + 副本出现。
+        let dst2 = base.join("dst2");
+        std::fs::create_dir_all(&dst2).unwrap();
+        std::fs::write(src.join("c.txt"), "C").unwrap();
+        std::fs::write(dst2.join("c.txt"), "old-c").unwrap();
+        crate::shell::copy_to_clipboard(host, &[src.join("c.txt")]).unwrap();
+        let content2 = crate::shell::get_clipboard().unwrap();
+        self.navigate_to(0, dst2.clone());
+        let done2 = unsafe {
+            self.paste_special_exec(
+                0, main, content2.paths.clone(), &[true],
+                crate::shell::PasteStrategy::Rename, content2.cut,
+            )
+        };
+        assert!(done2);
+        assert_eq!(std::fs::read_to_string(dst2.join("c.txt")).unwrap(), "old-c", "原名保留");
+        let n = std::fs::read_dir(&dst2).unwrap().count();
+        assert_eq!(n, 2, "Rename 后应出现副本文件（实测 n={n}）");
+        println!("[qdir-rs] TEST PASTESPECIAL ②Rename 完成（副本出现 n={n}）");
+        // ③ 空选拒绝。
+        let done3 = unsafe {
+            self.paste_special_exec(
+                0, main, content2.paths.clone(), &[false],
+                crate::shell::PasteStrategy::Ask, false,
+            )
+        };
+        assert!(!done3, "全不勾应拒绝");
+        println!("[qdir-rs] TEST PASTESPECIAL ③空选拒绝 完成");
+        let _ = std::fs::remove_dir_all(&base);
+        println!("[qdir-rs] TEST PASTESPECIAL 全部通过（对话框 *待实测*）");
+    }
+
+    /// 钩子 QDIR_TEST_SIZEINFO（P2 audit #45）：无选中=当前目录递归统计；
+    /// 选中行=逐项统计。MessageBox 本体 *待实测*（模态）。
+    unsafe fn sizeinfo_probe(&mut self, main: HWND) {
+        let base = std::env::temp_dir().join(format!("qdir-rs-sz-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&base);
+        let sub = base.join("sub");
+        std::fs::create_dir_all(sub.join("deep")).unwrap();
+        std::fs::write(base.join("a.txt"), "12345").unwrap();      // 5B
+        std::fs::write(sub.join("b.log"), "1234567").unwrap();      // 7B
+        self.navigate_to(0, base.clone());
+        // 清空选中（全选→反选）。
+        unsafe { self.select_all_rows(0) };
+        unsafe { self.invert_selection(0) };
+        let text = self.size_info_text_for(0);
+        println!("[qdir-rs] TEST SIZEINFO 无选中=\n{text}");
+        assert!(text.contains("2 文件 / 2 目录 /"), "递归统计缺失：{text}");
+        assert!(text.contains("12 字节"), "字节数缺失：{text}");
+        // 选中行0（名称升序首行=a.txt）。
+        let flat = base.join("flat");
+        std::fs::create_dir_all(&flat).unwrap();
+        std::fs::write(flat.join("a.txt"), "12345").unwrap();
+        std::fs::write(flat.join("b.log"), "1234567").unwrap();
+        self.navigate_to(0, flat);
+        unsafe {
+            let st = windows::Win32::UI::Controls::LVITEMW {
+                state: windows::Win32::UI::Controls::LIST_VIEW_ITEM_STATE_FLAGS(
+                    windows::Win32::UI::Controls::LVIS_SELECTED.0,
+                ),
+                stateMask: windows::Win32::UI::Controls::LIST_VIEW_ITEM_STATE_FLAGS(
+                    windows::Win32::UI::Controls::LVIS_SELECTED.0,
+                ),
+                ..Default::default()
+            };
+            SendMessageW(
+                self.panes[0].list.expect("list"),
+                windows::Win32::UI::Controls::LVM_SETITEMSTATE,
+                Some(WPARAM(0)),
+                Some(LPARAM(&st as *const _ as isize)),
+            );
+        }
+        let text2 = self.size_info_text_for(0);
+        println!("[qdir-rs] TEST SIZEINFO 选中行0=\n{text2}");
+        assert!(
+            text2.contains("a.txt：1 文件 / 0 目录 / 5 字节"),
+            "逐项统计缺失：{text2}"
+        );
+        assert!(text2.contains("选中项：1 文件 / 0 目录 / 5 字节"), "选中头缺失：{text2}");
+        let _ = main;
+        let _ = std::fs::remove_dir_all(&base);
+        println!("[qdir-rs] TEST SIZEINFO 全部通过（MessageBox *待实测*）");
+    }
+
+    /// 钩子 QDIR_TEST_HISTMENU（P2.10）：三目录导航 → 纯函数显示序断言
+    /// （当前▶置顶/后退逆序/前进顺序）→ go_history_to 绝对跳转（含越界
+    /// 拒绝）。TrackPopupMenu 弹层无法无头自动化 *待实测*。
+    unsafe fn histmenu_probe(&mut self, main: HWND) {
+        let base = std::env::temp_dir().join(format!("qdir-rs-hm-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&base);
+        let d1 = base.join("层一");
+        let d2 = base.join("层二");
+        let d3 = base.join("层三");
+        for d in [&d1, &d2, &d3] {
+            std::fs::create_dir_all(d).expect("建目录失败");
+        }
+        self.navigate_to(0, d1.clone());
+        self.navigate_to(0, d2.clone());
+        self.navigate_to(0, d3.clone());
+        let tabs_pos = self.session.panes[0].tabs_pos;
+        let entries = self.session.panes[0].tabs[tabs_pos].history_menu_entries(
+            crate::ui_native::menu::cmd_id::HIST_MENU_MAX,
+        );
+        // 历史含启动目录（主目录在最旧端），断言只锁三层相对序。
+        println!(
+            "[qdir-rs] TEST HISTMENU 显示序={entries:?}（期：▶层三、层二、层一、[启动目录…]）"
+        );
+        assert!(entries.len() >= 3, "至少包含三层");
+        assert!(entries[0].1.starts_with("▶ "), "当前项应置顶带 ▶");
+        assert!(entries[0].1.ends_with("层三"));
+        assert!(entries[1].1.ends_with("层二"), "后退段逆序");
+        assert!(entries[2].1.ends_with("层一"));
+        // ① 绝对跳转到「层一」（历史下标从显示序反查，不依赖启动目录数）。
+        let i1 = entries.iter().find(|(_, l)| l.ends_with("层一")).unwrap().0;
+        assert!(self.go_history_to(0, i1), "跳层一失败");
+        assert_eq!(self.pane_path(0), d1, "层一路径不符");
+        // ② 跳回栈顶（层三，下标 = 历史长-1）。
+        let top = self.session.panes[0].tabs[tabs_pos].history.len() - 1;
+        assert!(self.go_history_to(0, top), "跳栈顶失败");
+        assert_eq!(self.pane_path(0), d3, "栈顶路径不符");
+        // ③ 原位/越界拒绝。
+        assert!(!self.go_history_to(0, top), "原位应拒绝");
+        assert!(!self.go_history_to(0, 99), "越界应拒绝");
+        let _ = main;
+        let _ = std::fs::remove_dir_all(&base);
+        println!("[qdir-rs] TEST HISTMENU 全部通过（弹层 UI *待实测*）");
     }
 
     /// 钩子 QDIR_TEST_CLIP：临时 src 建文件 → Ctrl+X 剪切(断言 cut=true) →
@@ -4723,6 +6089,52 @@ fn format_bytes(b: u64) -> String {
 /// 文件大小列（原版「大小」：KB/MB/GB）。
 fn format_size(b: u64) -> String {
     format_bytes(b)
+}
+
+/// P2.5：LVM 组视图装配（apply_group_view 的 FFI 部分）——启用 → 清组 →
+/// 按 headers 建组（iGroupId=1..，顺序=行序首现）→ 逐行 LVIF_GROUPID 归组。
+/// 行键与 headers 必须出自同一 `distinct_first` 集合。
+unsafe fn listview_set_groups(lv: HWND, headers: &[String], row_keys: &[String]) {
+    unsafe {
+        let _ = SendMessageW(lv, LVM_ENABLEGROUPVIEW, Some(WPARAM(1)), None);
+        let _ = SendMessageW(lv, LVM_REMOVEALLGROUPS, None, None);
+        for (i, h) in headers.iter().enumerate() {
+            let mut text: Vec<u16> = h.encode_utf16().chain(std::iter::once(0)).collect();
+            let mut g = LVGROUP {
+                cbSize: std::mem::size_of::<LVGROUP>() as u32,
+                mask: LVGF_GROUPID | LVGF_HEADER,
+                iGroupId: (i as i32) + 1,
+                cchHeader: (text.len() as i32) - 1,
+                pszHeader: windows::core::PWSTR(text.as_mut_ptr()),
+                ..Default::default()
+            };
+            let _ = SendMessageW(
+                lv,
+                LVM_INSERTGROUP,
+                Some(WPARAM(i)),
+                Some(LPARAM(&g as *const LVGROUP as isize)),
+            );
+        }
+        for (row, k) in row_keys.iter().enumerate() {
+            let gid = headers
+                .iter()
+                .position(|h| h == k)
+                .map(|x| x as i32 + 1)
+                .unwrap_or(0);
+            let it = LVITEMW {
+                mask: LVIF_GROUPID,
+                iItem: row as i32,
+                iGroupId: gid,
+                ..Default::default()
+            };
+            let _ = SendMessageW(
+                lv,
+                LVM_SETITEMW,
+                Some(WPARAM(0)),
+                Some(LPARAM(&it as *const LVITEMW as isize)),
+            );
+        }
+    }
 }
 
 /// 选中列表的某一行（测试钩子；行号越界则忽略）。

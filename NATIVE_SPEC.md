@@ -521,6 +521,15 @@ FUN_004d0370：按 id 给活动窗格内容窗发 **0x7029/0x702A/0x702B/0x702C*
 
 机制：每个 id = 一个**已存状态槽**（表 param+0x7C90）；单击=载入该槽（FUN_0046cc14），Ctrl=复制路径，Shift=另存到槽，Del=删除。对应 Q-Dir「桌面/布局槽」功能。*业务命名待复核*（槽的 UI 入口在哪个菜单未逐条对照）。
 
+> **勘验增量（2026-10-24）**：主 WM_COMMAND 分发器确认槽族入口条件
+> `(ushort)(id + 0x4868) < 0x3e9` —— 无符号回绕等价于 **id∈[0xB798,0xBB80]**
+> （0x10000−0x4868=0xB798，与本表记载一致），即 1000 个连续 WM_COMMAND id
+> 直接进 FUN_00474a34（AF:86814）。内部再证：槽表键查 `FUN_004ee518(
+> param+0x7C90, id, …)`；Ctrl（GetKeyState(0x11)<0）→ 路径复制到
+> param+0xC00 + SetTimer(0x2711, 300ms)；Shift（0x10<0）→ FUN_004a037c/
+> FUN_004a0414 另存链；默认=载入。**1000 个 id 的菜单/弹层构建源在 AF 仍无
+> 静态命中**（疑 TrackPopupMenu 动态 id 或外部宿主），入口位置维持 *待复核*。
+
 ### A.8 开关型设置项（catch-all 直接写配置键——行为=改 ini+重绘）
 
 确证键映射（读 DAT + FUN_004554a0(写键) 即得）：audio_click=0x84F5(34013)、select_last_if_navigate_up=0x84F4、refresh_keep_sel=0xB339(45881)、show_tabs=0x8558/0x8559(34136/34137)、tree_auto_sel=0xB31E、tree_fullrowselect=0xB250、autocomplete=0xB36F、autocomplete_url=0xB370、address_ico=0xB375/6、adress_sw_driver=0xB336、adress_tree=0xB325 组、useColor/useColor2=0x84F4 组、folders=0x8019–0x802b 段（FUN_00467268）。列显隐 0x80C0–0x80CB（FUN_0045b114，写 `Als` 位）。
@@ -528,3 +537,31 @@ FUN_004d0370：按 id 给活动窗格内容窗发 **0x7029/0x702A/0x702B/0x702C*
 > **实现指引**：本表按「行为=改配置键+重绘」逐项落到自绘设置，不需要原版
 > 文案；文案由我们自定（R1）。旧 commands.rs 的 cmd::NEW_FOLDER/COPY/CUT/
 > PASTE 常量语义作废，落地 P1 时按 A.1 重命名。
+
+### A.9 Spatlen_* 视图状态 blob（ini [Column_OS_10.0_PloderN]，2026-10-24 字节取证）
+
+证据源：`D:\Q-Dir_Portable_x64\Q-Dir\Q-Dir.ini`（UTF-16LE，sha 见原版目录）。
+该段仅有 `Spatlen_::{20D04FE0-…}` 与 `Spatlen_329` 两种键，值=**%XX 百分号
+转义字节串**：
+
+1. 解码后 798 字节 = **772 净载荷 + 26 字节 ASCII 尾标**
+   `|CODEMODE1|-1905896973|772`（`Spatlen_329` 为 797=772+25，校验值不同）。
+   尾标=`|CODEMODE<版本>|<i32 校验>|<净载荷长度>`；校验算法未确证 *待复核*。
+2. 净载荷是 **shell 视图状态属性袋**："1SPS" 魔数 + FMTID
+   d5cdd505-2e9c-101b-9397-08002b2cf9ae（Explorer IShellView::SaveViewState
+   的标准序列化）。**条目不做 4 字节对齐**（逐键紧排、各键起点奇偶不一）
+   ——解析必须锚定键名，不能游标步进。
+3. 已确证标量键（键名  → u32 VT → u32 值；VT_BOOL=11 取低 16 位有符号）：
+   `GroupByKey:FMTID`(VT_BSTR="{B725F130-47EF-101A-A5F1-02608C9EEBAC}")、
+   `GroupByDirection`=1、`Sort`(VT_STREAM="prop4294967295")、`GroupView`=-1(true)、
+   `ViewMode`（紧邻二进制块，字节语义未闭合 *待复核*）、`IconSize`=16、
+   `ColInfo`(VT_STREAM)、`GroupByKey:PID`=4、`FFlags`=0x40200005=**1075838981**、
+   `LogicalViewMode`=1。
+4. 交叉验证：IconSize=16 / FFlags=1075838981 与 L-Dir core 默认值一致。
+
+> **L-Dir 落地（P2.6）**：`shell::viewstate` 锚定键名解码 →
+> `core::ColumnViewState` 投影（icon_size/folder_flags/group/logical_view_mode/
+> group_by_dir），`load_config_bytes` 导入 [Column_OS_10.0_PloderN] 各段，
+> `MainFrame::new` 应用到窗格（view_mode 不覆盖——.qdr 优先 *待复核*）。
+> 本程序保存 ini 不写出 Spatlen（R2 自名格式）。Sort/ColInfo/键序列表等
+> 复杂键未建模 *待复核*。

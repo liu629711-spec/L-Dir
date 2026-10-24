@@ -715,6 +715,25 @@ pub fn load_config_bytes(bytes: &[u8]) -> QResult<Config> {
         get_string(&doc, INI_SECTIONS::START, KEYS::LAST_FILE_FILTER, &cfg.last_file_filter);
     cfg.fav_filter = get_string(&doc, INI_SECTIONS::START, KEYS::FAV_FILTER, &cfg.fav_filter);
 
+    // ---- [Column_OS_10.0_PloderN] Spatlen_* 视图状态 blob（P2.6 导入）----
+    // 原版 ini 每窗格一段，段内 Spatlen_ 值是百分号转义的 1SPS 属性袋
+    // （shell::viewstate 取证）。解析失败（短载荷/非转义字节）按缺省
+    // 处理不报错——原版 ini 的该段来自 Explorer 视图状态，容忍变体。
+    for n in 1..=4u32 {
+        let Some(pane_id) = crate::core::PaneId::from_number(n) else { continue };
+        let section = pane_id.ini_section();
+        if let Some(sec) = doc.section(&section) {
+            for (k, v) in sec.kv() {
+                if k.starts_with("Spatlen_") {
+                    if let Ok(st) = crate::shell::column_view_state_from_blob(v) {
+                        cfg.column_views[(n - 1) as usize] = Some(st);
+                        break; // 首个可解析键即该窗格视图状态（实测同段两键等价）
+                    }
+                }
+            }
+        }
+    }
+
     Ok(cfg)
 }
 

@@ -27,10 +27,14 @@ mod enumerate;
 mod fileops;
 mod icons;
 mod idlist;
+mod pasteplan;
+mod recycle;
+mod sizeinfo;
 mod special;
 mod startup;
 mod system;
 mod tray;
+mod viewstate;
 mod watch;
 
 pub use clipboard::{
@@ -45,9 +49,18 @@ pub use dragdrop::{
     DragOutcome, DropFiles, DropReject, DropTarget, DroppedPaths, PaneDropTarget, accept_drop_files,
     allows_copy, allows_move, begin_drag, begin_drag_ex, drop_reject_reason,
     paths_from_data_object, push_dropped, register_drop_target, resolve_drop_effect,
-    revoke_drop_target, take_dropped, DROPEFFECT_COPY_VALUE, DROPEFFECT_MOVE_VALUE,
+    revoke_drop_target, take_dropped, DROPEFFECT_COPY_VALUE, DROPEFFECT_LINK_VALUE,
+    DROPEFFECT_MOVE_VALUE,
 };
 pub use watch::{register_change_notify, WatchHandle};
+pub use recycle::{
+    DeleteBatch, RecycleEntry, RestoreReport, UNDO_STACK_LIMIT, drive_anchor_of, now_filetime,
+    parse_i_file, pick_restore_entry, restore_batch, restore_batch_checked, r_path_of,
+    scan_drive_bin, system_time_to_filetime, unique_restore_name,
+};
+pub use sizeinfo::{DirStats, dir_stats, fmt_bytes, info_text, stats_of_paths};
+pub use pasteplan::{PasteErr, PasteStrategy, dest_names, plan_paste_special};
+pub use viewstate::{column_view_state_from_blob, extract_scalar_props, split_codemode, unescape_pct};
 pub use idlist::{
     decode_pidl_hex, encode_pidl_hex, idlist_hex_to_path, path_to_idlist_hex,
 };

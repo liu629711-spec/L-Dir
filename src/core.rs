@@ -750,6 +750,25 @@ impl TabState {
         Ok(())
     }
 
+    /// P2.10：历史下拉显示序（纯函数，单测锁定）——当前项（▶ 前缀）置顶，
+    /// 其后后退段（pos−1 → 0 逆序，越近越前）、前进段（pos+1 → 末尾顺序）；
+    /// 超出 `max` 截断（丢最旧的后退段）。返回 (history 下标, 标签)。
+    pub fn history_menu_entries(&self, max: usize) -> Vec<(usize, String)> {
+        let mut out: Vec<(usize, String)> = Vec::new();
+        if let Some(cur) = self.history.get(self.history_pos) {
+            out.push((self.history_pos, format!("▶ {}", cur.display())));
+        }
+        for i in (0..self.history_pos).rev() {
+            out.push((i, self.history[i].display().to_string()));
+        }
+        for i in self.history_pos + 1..self.history.len() {
+            out.push((i, self.history[i].display().to_string()));
+        }
+        out.truncate(max);
+        out
+    }
+
+    /// 导航到新目录：截断前进栈，压入新路径，刷新标题。
     /// 导航到新目录：截断前进栈，压入新路径，刷新标题。
     pub fn navigate(&mut self, path: PathBuf) {
         self.history.truncate(self.history_pos + 1);
@@ -934,6 +953,11 @@ impl ColumnConfig {
         )
     }
 
+    /// 分组是否激活（group 开 + 非空键）。
+    pub fn group_active(&self) -> bool {
+        self.group && !self.group_by.is_empty()
+    }
+
     /// 列可见性位串（批次D/D3 持久化用；qdr `ColsVisibleN` 自名键）。
     /// 按 `columns` 顺序逐列输出 '1'/'0'，如 `"11110"`。
     pub fn cols_visible_string(&self) -> String {
@@ -999,6 +1023,27 @@ impl ColumnConfig {
         }
         Ok(cfg)
     }
+}
+
+/// P2.5：扩展名分组标签（GroupBy=Ext）——大写扩展名，无扩展名（含目录）
+/// →「(无扩展名)」。分组头是否带计数 Explorer 式「TXT (3)」原版未取证
+/// *待复核*，取朴素标签。
+pub fn group_label_ext(name: &str) -> String {
+    match std::path::Path::new(name).extension() {
+        Some(e) if !e.is_empty() => e.to_string_lossy().to_uppercase(),
+        _ => "(无扩展名)".to_string(),
+    }
+}
+
+/// P2.5：按首次出现顺序去重（分组头序 = 行序首现，与列表浏览顺序一致）。
+pub fn distinct_first(keys: &[String]) -> Vec<String> {
+    let mut seen: Vec<String> = Vec::new();
+    for k in keys {
+        if !seen.iter().any(|s| s == k) {
+            seen.push(k.clone());
+        }
+    }
+    seen
 }
 
 // ============ 10. 分割条 ============
@@ -1246,6 +1291,39 @@ impl Default for TabConfig {
     }
 }
 
+/// 原版 ini `Column_OS_10.0_PloderN` 段 `Spatlen_*` blob 的**导入投影**
+/// （P2.6，2026-10-24 取证）。原始 blob 是 1SPS 属性袋（shell::viewstate
+/// 取证注释），只提取已确证的标量键；键序/宽度列表等复杂键不建模
+/// *待复核*。数字取证表：
+/// - IconSize=16（VT_UI4）→ image_size（与 core 默认值吻合）
+/// - FFlags=0x40200005=1075838981（VT_UI4）→ folder_flags（同上吻合）
+/// - LogicalViewMode=1（VT_UI4）→ logical_view_mode（不直接改 view_mode，
+///   .qdr 的 ViewMode 优先 *待复核*）
+/// - GroupView=true（VT_BOOL）→ group
+/// - GroupByDirection=1（VT_UI4）→ group_by_dir
+/// - GroupByKey:PID=4 / GroupByKey:FMTID={B725F130-…}（复合键，只留档）
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ColumnViewState {
+    pub icon_size: u32,
+    pub folder_flags: u32,
+    pub logical_view_mode: u32,
+    pub group: bool,
+    pub group_by_dir: u32,
+}
+
+impl Default for ColumnViewState {
+    // 取实测 blob 的六个标量值作为「原版等价默认」。
+    fn default() -> Self {
+        ColumnViewState {
+            icon_size: 16,
+            folder_flags: 1075838981,
+            logical_view_mode: 1,
+            group: false,
+            group_by_dir: 1,
+        }
+    }
+}
+
 /// 文件操作与刷新行为配置。
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct FileOpsConfig {
@@ -1304,6 +1382,10 @@ pub struct Config {
     pub tree: TreeConfig,
     pub tab: TabConfig,
     pub file_ops: FileOpsConfig,
+    /// 原版 ini [Column_OS_10.0_PloderN] 段 Spatlen_* blob 的导入投影
+    /// （P2.6；shell::viewstate 解码后填入，None=该窗格无 blob 或不可解析）。
+    /// 仅导入消费，本程序保存 ini 时不写出（R2：默认写自名文件）。
+    pub column_views: [Option<ColumnViewState>; 4],
     // 其余配置键（全部需在设置里可改）
     pub columns_plus_view: bool,   // columns_plus_view
     pub colorthema: u32,           // colorthema
@@ -1340,6 +1422,7 @@ impl Default for Config {
             tree: TreeConfig::default(),
             tab: TabConfig::default(),
             file_ops: FileOpsConfig::default(),
+            column_views: [None, None, None, None],
             columns_plus_view: false,
             colorthema: 0,
             langid: 1031,
@@ -1762,6 +1845,65 @@ mod tests {
         assert_eq!(back2.view_mode, ViewMode::List);
         assert!(ColumnConfig::parse_view_state_string("ViewMode,9").is_err());
         assert_eq!(ColumnConfig::default().image_size, 16);
+    }
+
+    #[test]
+    fn group_helpers() {
+        // 扩展名标签：大写、无扩展名（含目录）回落。
+        assert_eq!(super::group_label_ext("a.txt"), "TXT");
+        assert_eq!(super::group_label_ext("photo.JPG"), "JPG");
+        assert_eq!(super::group_label_ext("撤销子目录"), "(无扩展名)");
+        assert_eq!(super::group_label_ext("makefile"), "(无扩展名)");
+        // 首现去重：序 = 行序首现。
+        let keys = vec![
+            "TXT".to_string(),
+            "LOG".to_string(),
+            "TXT".to_string(),
+            "(无扩展名)".to_string(),
+        ];
+        assert_eq!(
+            super::distinct_first(&keys),
+            vec!["TXT", "LOG", "(无扩展名)"]
+        );
+        assert!(super::distinct_first(&[]).is_empty());
+        // group_active 决策。
+        let mut cfg = ColumnConfig::default();
+        assert!(!cfg.group_active());
+        cfg.group = true;
+        assert!(!cfg.group_active(), "空键不算激活");
+        cfg.group_by = "Ext".into();
+        assert!(cfg.group_active());
+    }
+
+    #[test]
+    fn history_menu_entries_display_order() {
+        let mut t = TabState::new(PathBuf::from(r"C:\a"));
+        t.navigate(PathBuf::from(r"C:\b"));
+        t.navigate(PathBuf::from(r"C:\c"));
+        t.navigate(PathBuf::from(r"C:\d"));
+        t.back().unwrap();
+        t.back().unwrap();
+        // pos=1 (C:\b)：显示 = 当前▶、后退段(b-1→a)、前进段(c,d)。
+        let es = t.history_menu_entries(40);
+        assert_eq!(es.len(), 4);
+        assert_eq!(es[0].0, 1, "当前项置顶");
+        assert!(es[0].1.starts_with("▶ "), "当前项带 ▶ 前缀");
+        assert_eq!(es[1].0, 0, "后退段逆序：最近的先");
+        assert!(es[1].1.ends_with(r"C:\a"), "后退段路径正确");
+        assert_eq!(es[2].0, 2, "前进段顺序");
+        assert!(es[2].1.ends_with(r"C:\c"));
+        assert_eq!(es[3].0, 3);
+        // 截断：只保留最近 2 条（当前+1 后退，前进段全丢）。
+        let es2 = t.history_menu_entries(2);
+        assert_eq!(es2.len(), 2);
+        assert_eq!(es2[0].0, 1);
+        assert_eq!(es2[1].0, 0);
+        // 单条历史：仅当前项。
+        let t0 = TabState::new(PathBuf::from(r"C:\x"));
+        let es0 = t0.history_menu_entries(40);
+        assert_eq!(es0.len(), 1);
+        assert_eq!(es0[0].0, 0);
+        assert!(es0[0].1.starts_with("▶ "));
     }
 
     #[test]

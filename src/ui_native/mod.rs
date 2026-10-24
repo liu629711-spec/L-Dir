@@ -4,9 +4,11 @@
 //! 资源策略：原版模板字节（assets/extracted）运行时直接消费——布局同源。
 
 pub mod app;
+pub mod arrange;
 pub mod commands;
 pub mod mainframe;
 pub mod menu;
+pub mod paste_dialog;
 pub mod rules_dialog;
 pub mod settings_dialog;
 pub mod slots_dialog;

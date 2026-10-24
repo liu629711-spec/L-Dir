@@ -19,12 +19,14 @@ use windows::Win32::UI::Controls::{
 };
 use windows::Win32::UI::Input::KeyboardAndMouse::{
     GetKeyState, ReleaseCapture, SetCapture, VK_A, VK_BACK, VK_C, VK_CONTROL, VK_DELETE, VK_F2,
-    VK_RETURN, VK_SHIFT, VK_T, VK_V, VK_X,
+    VK_RETURN, VK_SHIFT, VK_T, VK_V, VK_X, VK_Z,
 };
 use windows::Win32::UI::Shell::{DefSubclassProc, SetWindowSubclass};
+use windows::Win32::Graphics::Gdi::ScreenToClient;
 use windows::Win32::UI::WindowsAndMessaging::{
-    GetClassNameW, GetSystemMetrics, SendMessageW, SYSTEM_METRICS_INDEX, WM_KEYDOWN,
-    WM_LBUTTONDBLCLK, WM_LBUTTONDOWN, WM_LBUTTONUP, WM_MBUTTONUP, WM_MOUSEMOVE, WM_NOTIFY,
+    GetClassNameW, GetSystemMetrics, SendMessageW, SYSTEM_METRICS_INDEX, WM_CONTEXTMENU,
+    WM_KEYDOWN, WM_LBUTTONDBLCLK, WM_LBUTTONDOWN, WM_LBUTTONUP, WM_MBUTTONUP, WM_MOUSEMOVE,
+    WM_NOTIFY,
 };
 
 /// NMHEADERW 布局（header 通知发给其父 ListView）；仅取 hdr.code 与 iItem。
@@ -87,6 +89,7 @@ pub fn ctrl_list_action(vk: u32) -> Option<crate::ui_native::mainframe::KbAction
         v if v == VK_A.0 as u32 => KbAction::SelectAll,
         v if v == VK_DELETE.0 as u32 => KbAction::Delete,
         v if v == VK_T.0 as u32 => KbAction::NewTab,
+        v if v == VK_Z.0 as u32 => KbAction::UndoDelete,
         _ => return None,
     };
     Some(a)
@@ -124,6 +127,122 @@ unsafe extern "system" fn sub_proc(
     // 标签交互（P2 开关，core::tab_click_action 决策）：
     // 中键=关闭（close_by_mbt_clk），左键双击=关闭（close_by_lbt_dblclk，
     // 开关关时也吞掉 dblclk 防标签跳变）。TCM_HITTEST 定位命中标签。
+    // P2（audit #11）：空白区双击/单击=新建标签页（tab_new_tab_l_dblclk
+    // 默认开 / tab_new_tab_l_clk 默认关；原版键建模已久，本项接通消费）。
+    if msg == WM_LBUTTONDOWN || msg == WM_LBUTTONDBLCLK {
+        let pidx = refdata >> 2;
+        let role = refdata & 3;
+        if role == ROLE_TAB && pidx < 4 {
+            let pt = POINT {
+                x: ((lp.0 & 0xFFFF) as i16) as i32,
+                y: ((lp.0 >> 16) as i16) as i32,
+            };
+            let mut hti = TCHITTESTINFO {
+                pt,
+                flags: TCHITTESTINFO_FLAGS(0),
+            };
+            let hit = unsafe {
+                SendMessageW(
+                    hwnd,
+                    TCM_HITTEST,
+                    Some(WPARAM(0)),
+                    Some(LPARAM(&mut hti as *mut _ as isize)),
+                )
+            };
+            if hit.0 < 0 {
+                // 空白区：按开关新建标签页并吞事件（双击防跳变）。
+                let want = if msg == WM_LBUTTONDBLCLK {
+                    let mut frame_ok = false;
+                    if let Some(main) = main_hwnd() {
+                        if let Some(frame) = MainFrame::frame_of(main) {
+                            if frame.config.tab.new_tab_l_dblclk {
+                                let path = frame.pane_path(pidx);
+                                unsafe { frame.pane_add_tab(pidx, path) };
+                                println!(
+                                    "[qdir-rs] TEST 标签空白双击 新建标签页 窗格{} len={} pos={}",
+                                    pidx + 1,
+                                    frame.session.panes[pidx].tabs.len(),
+                                    frame.session.panes[pidx].tabs_pos
+                                );
+                                frame_ok = true;
+                            }
+                        }
+                    }
+                    frame_ok
+                } else {
+                    let mut frame_ok = false;
+                    if let Some(main) = main_hwnd() {
+                        if let Some(frame) = MainFrame::frame_of(main) {
+                            if frame.config.tab.new_tab_l_clk {
+                                let path = frame.pane_path(pidx);
+                                unsafe { frame.pane_add_tab(pidx, path) };
+                                println!(
+                                    "[qdir-rs] TEST 标签空白单击 新建标签页 窗格{}",
+                                    pidx + 1
+                                );
+                                frame_ok = true;
+                            }
+                        }
+                    }
+                    frame_ok
+                };
+                if want || msg == WM_LBUTTONDBLCLK {
+                    // 双击在空白区一律吞掉（无论开关），防原生跳变。
+                    return LRESULT(0);
+                }
+                // 单击空白且未开开关：交默认处理。
+            }
+        }
+    }
+    // 标签右键弹层（P2 audit #12；tab_use_context_menu 门）。WM_CONTEXTMENU
+    // lParam=屏幕坐标 → ScreenToClient → TCM_HITTEST 定位标签 → 先选中后弹。
+    if msg == WM_CONTEXTMENU {
+        let pidx = refdata >> 2;
+        let role = refdata & 3;
+        if role == ROLE_TAB && pidx < 4 {
+            if let Some(main) = main_hwnd() {
+                if let Some(frame) = MainFrame::frame_of(main) {
+                    if frame.config.tab.use_context_menu {
+                        let mut pt = POINT {
+                            x: ((lp.0 & 0xFFFF) as i16) as i32,
+                            y: (((lp.0 >> 16) & 0xFFFF) as i16) as i32,
+                        };
+                        let _ = ScreenToClient(hwnd, &mut pt);
+                        let mut hti = TCHITTESTINFO {
+                            pt,
+                            flags: TCHITTESTINFO_FLAGS(0),
+                        };
+                        let hit = unsafe {
+                            SendMessageW(
+                                hwnd,
+                                TCM_HITTEST,
+                                Some(WPARAM(0)),
+                                Some(LPARAM(&mut hti as *mut _ as isize)),
+                            )
+                        };
+                        println!(
+                            "[qdir-rs] TEST 标签右键 命中标签={}",
+                            hit.0
+                        );
+                        if hit.0 >= 0 {
+                            unsafe {
+                                frame.show_tab_menu(
+                                    main,
+                                    pidx,
+                                    hit.0 as usize,
+                                    POINT {
+                                        x: ((lp.0 & 0xFFFF) as i16) as i32,
+                                        y: (((lp.0 >> 16) & 0xFFFF) as i16) as i32,
+                                    },
+                                );
+                            }
+                            return LRESULT(0);
+                        }
+                    }
+                }
+            }
+        }
+    }
     if msg == WM_MBUTTONUP || msg == WM_LBUTTONDBLCLK {
         let pidx = refdata >> 2;
         let role = refdata & 3;
@@ -241,6 +360,23 @@ unsafe extern "system" fn sub_proc(
                 // list 角色 Ctrl 组合键（批次A）：作用域=发键窗格。
                 // 吞掉（返回 0）以免原生 ListView 把 Ctrl+C 当文本复制。
                 if role == ROLE_LIST && key_ctrl_held(lp) {
+                    // Ctrl+Shift+V=选择性粘贴（menu_texts:43；让路给
+                    // 同名对话框路径，与全局加速键双通道一致）。
+                    if vk == VK_V.0 as u32
+                        && (unsafe { GetKeyState(VK_SHIFT.0 as i32) } as i16) < 0
+                    {
+                        let done = frame.keyboard_action(
+                            pidx,
+                            crate::ui_native::mainframe::KbAction::PasteSpecial,
+                            main,
+                        );
+                        println!(
+                            "[qdir-rs] TEST 键盘 Ctrl+Shift+V 窗格{} -> {}",
+                            pidx + 1,
+                            if done { "完成" } else { "取消/空剪贴板" }
+                        );
+                        return LRESULT(0);
+                    }
                     if let Some(action) = ctrl_list_action(vk) {
                         let done = frame.keyboard_action(pidx, action, main);
                         println!(
@@ -273,6 +409,24 @@ unsafe extern "system" fn sub_proc(
                     );
                     return LRESULT(0);
                 }
+                // Shift+Enter（menu_texts:42「Shift+Enter 或 Shift+Ctrl+T」）：
+                // 选中目录逐个开新签。物理 Shift 经 GetKeyState 读取（合成
+                // 键无 shift 位声明），钩子走 keyboard_action 直测。
+                if role == ROLE_LIST && vk == VK_RETURN.0 as u32
+                    && (unsafe { GetKeyState(VK_SHIFT.0 as i32) } as i16) < 0
+                {
+                    let done = frame.keyboard_action(
+                        pidx,
+                        crate::ui_native::mainframe::KbAction::OpenSelNewTab,
+                        main,
+                    );
+                    println!(
+                        "[qdir-rs] TEST 键盘 Shift+Enter 窗格{} -> {}",
+                        pidx + 1,
+                        if done { "已开签" } else { "无目录选中" }
+                    );
+                    return LRESULT(0);
+                }
                 let handled = match role {
                     ROLE_LIST if vk == VK_RETURN.0 as u32 => {
                         frame.open_selection(pidx);
@@ -297,8 +451,14 @@ unsafe extern "system" fn sub_proc(
     DefSubclassProc(hwnd, msg, wp, lp)
 }
 
-/// 触发一次窗格拖出（批次B/B2）：读选中路径 → 按键决议 preferred →
-/// `begin_drag_ex`（allowed=COPY|MOVE 双许可）→ Move 成功则重灌源窗格。
+/// 触发一次窗格拖出（批次B/B2；P1.2 对齐原版证据）：读选中路径 →
+/// `begin_drag_ex`。原版拖出源 = `SHDoDragDrop(...,7,...)` 全许可
+/// COPY|MOVE|LINK 且**无源端按键预决议、无 Preferred 预写**
+/// （AF:107517/115276/178576）——效应交目标端标准规则决议（Explorer：
+/// 无键=同盘移动/跨盘复制、Ctrl=复制、Shift=移动、Alt=快捷方式）；
+/// 本进程窗格间无键默认=移动（resolve_drop_effect None→MOVE 惯例
+/// *待实测复核*）。DoDragDrop 模态在 WM_MOUSEMOVE 内运行属正常用法；
+/// Move 成功由本函数重灌源窗格。
 /// 返回是否真的进入了拖放（无选中/启动失败返回 false，调用方继续默认处理）。
 unsafe fn start_pane_drag(pidx: usize) -> bool {
     let Some(main) = main_hwnd() else {
@@ -312,23 +472,11 @@ unsafe fn start_pane_drag(pidx: usize) -> bool {
         return false;
     }
     let host = crate::shell::HostWindow::from_raw_hwnd(main.0 as isize);
-    let ctrl = (unsafe { GetKeyState(VK_CONTROL.0 as i32) } as i16) < 0;
-    let shift = (unsafe { GetKeyState(VK_SHIFT.0 as i32) } as i16) < 0;
-    // Ctrl→COPY；Shift/默认→MOVE（Q-Dir 窗格间默认移动 *待实测复核*）。
-    let preferred = if ctrl {
-        crate::shell::DROPEFFECT_COPY_VALUE
-    } else if shift {
-        crate::shell::DROPEFFECT_MOVE_VALUE
-    } else {
-        crate::shell::DROPEFFECT_MOVE_VALUE
-    };
-    let allowed = crate::shell::DROPEFFECT_COPY_VALUE | crate::shell::DROPEFFECT_MOVE_VALUE;
-    println!(
-        "[qdir-rs] TEST 拖出 窗格{} {} 项 ctrl={ctrl} shift={shift}",
-        pidx + 1,
-        paths.len()
-    );
-    match crate::shell::begin_drag_ex(host, &paths, allowed, preferred) {
+    let allowed = crate::shell::DROPEFFECT_COPY_VALUE
+        | crate::shell::DROPEFFECT_MOVE_VALUE
+        | crate::shell::DROPEFFECT_LINK_VALUE;
+    println!("[qdir-rs] TEST 拖出 窗格{} {} 项 allowed=7", pidx + 1, paths.len());
+    match crate::shell::begin_drag_ex(host, &paths, allowed, None) {
         Ok(crate::shell::DragOutcome::Move) => {
             // 移动成功：源文件已不在，重灌源窗格。
             unsafe { frame.fill_pane(pidx) };
@@ -404,13 +552,14 @@ mod tests {
     }
 
     #[test]
-    fn ctrl组合键映射六动作() {
+    fn ctrl组合键映射七动作() {
         assert_eq!(ctrl_list_action(VK_C.0 as u32), Some(KbAction::Copy));
         assert_eq!(ctrl_list_action(VK_X.0 as u32), Some(KbAction::Cut));
         assert_eq!(ctrl_list_action(VK_V.0 as u32), Some(KbAction::Paste));
         assert_eq!(ctrl_list_action(VK_A.0 as u32), Some(KbAction::SelectAll));
         assert_eq!(ctrl_list_action(VK_DELETE.0 as u32), Some(KbAction::Delete));
         assert_eq!(ctrl_list_action(VK_T.0 as u32), Some(KbAction::NewTab));
+        assert_eq!(ctrl_list_action(VK_Z.0 as u32), Some(KbAction::UndoDelete));
         // 未绑定的组合键放行（返回 None，交默认过程）。
         assert_eq!(ctrl_list_action(VK_RETURN.0 as u32), None);
         assert_eq!(ctrl_list_action(windows::Win32::UI::Input::KeyboardAndMouse::VK_F3.0 as u32), None);

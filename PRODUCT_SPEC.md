@@ -268,6 +268,142 @@ P1 必须（产品可用性），按行为表证据实现；P2 体验完整；P3
   IsWindowVisible=false（「TEST 托盘：最小化隐藏窗格主窗」）→
   WM_TRAY|WM_LBUTTONDBLCLK→visible=true（「TEST 托盘还原 DoubleClick」）；
   右键/中键分别「菜单」「忽略」日志确证。286 lib + 11 全绿。
+- ✅ P1.1 撤销删除 Ctrl+Z（2026-10-24，DEV_SPEC_UNDO_DELETE.md 全程在案）：
+  原版 menu_texts:79「撤消 删除(U)\tCtrl+Z」确证存在（视图菜单），机制未反
+  编译确证*待复核*，按取证界公开的回收站 `$I`/`$R` 格式自实现：删除前采
+  t0 → `delete_files(FOF_ALLOWUNDO)` → 批次栈（上限 32）；Ctrl+Z 弹尾 →
+  扫原路径盘 `$Recycle.Bin\<SID>\$I*`（v1 固定 520 字节名区/v2 名长字段
+  双口径防御解析）按「原路径大小写不敏感 + 时刻 ≥ t0−1s」取最新条目 →
+  `$R` 同名 I→R 定位 → `MoveFileW` 同盘改名还原；目标占用自动改名
+  `名 (n).扩展名` *待复核*（Explorer 同场景弹询问）。`shell/recycle.rs`
+  8 单测（解析/口径/锚/唯一名/时间换算）；键盘 Ctrl+Z（子类化 VK_Z）+
+  查看菜单「撤消 删除(&U)\tCtrl+Z」(30047) 双入口；键盘 Del 与命令按钮
+  bi=4 收敛为 `delete_selection_with_undo` 统一入口。**教训**：FILETIME
+  纪元常数首版多写两个零（1.16e19 vs 1.164e17），单测断言抄同值自我印证，
+  端到端钩子才暴露——now() 已加数量级带宽断言（1970..2034）防回归。
+  端到端（QDIR_TEST_UNDO）：多选 2/2 → Del 全链源消失 → Ctrl+Z 恢复 2/2
+  （文件+子目录含内文件内容一致）→ 二次 Ctrl+Z 空栈拒绝。
+  **顺带修复三处菜单 id 撞车**（新增回归测试「命令段两两不交」抓出）：
+  COL_BASE 30040→30110、ZOOM_BASE 30040→30250（30040–30050 段内含
+  FILE_SLOTS=30046，点缩放 130% 会先匹配槽对话框臂）、LAYOUT_BASE
+  30090→30230（与 FAV_ADD/FAV_MANAGE 30100/30101 命名空间重叠）。
+  lib 340 + 集成 14 全绿（354），全量 15 钩子复跑无回归。
+- ✅ P1.2 拖出源语义对齐 + P2.7 每窗格视图 + P2.9 窗口排列（2026-10-24）：
+  **P1.2**：反编译取证闭合——原版拖出源三处全是 `SHDoDragDrop(hwnd,This,
+  NULL,7,&eff)`（AF:107517/115276/178576），**全许可 COPY|MOVE|LINK 且源端
+  无按键预决议、无 Preferred 预写**，效应交目标端标准规则（Explorer：无键=
+  同盘移动/跨盘复制、Ctrl=复制、Shift=移动、Alt=快捷方式）。原先
+  「Ctrl→COPY/默认→MOVE *待复核*」的源端预决议与预写 preferred 已删；
+  `begin_drag_ex` preferred 形参改 `Option<u32>`（None=不写，兼容包装
+  begin_drag 仍传单值）；allowed 改 7（+LINK）。窗格间无键默认移动由
+  `resolve_drop_effect` None→MOVE 惯例承担 *待实测复核*。**顺带确证**
+  `copy_cut_paste_mode`（AF:67219/84516/84627）：0x8568=0/0x8569=1 双菜单
+  命令互斥勾选并落 ini，mode=1 时命令 0x7018/0x7019 系（复制/剪切按钮）
+  会以 Preferred DropEffect=MOVE 重包剪贴板数据——是**复制/剪切按钮模式**
+  开关，与拖出源无关（留待 P2 接线）。
+  **P2.7**：视图模式命令改只作用**活动窗格**（A.5：FUN_004d0370 给活动窗
+  发 0x7029–0x702C *待复核*）；`set_view_mode_active` 写当前标签页
+  `TabState.view_mode`（core 已建模、config 可持久化但 UI 从未消费——本项
+  接通）+ 仅该窗格 LVM_SETVIEW；fill_pane 按标签页应用视图（None→默认
+  详情），切页/.qdr 载入视图随恢复；全窗格一刀切版删除。
+  **P2.9**：`ui_native/arrange.rs`——纯函数 `arrange_rects`（层叠=工作区
+  3/4+24px 阶梯；横向平铺=Nebeneinander 左右列；纵向平铺=Untereinander
+  上下行；最小边钳 120px，4 单测）+ `arrange_windows`（EnumWindows 按
+  类名 LDir.MainFrame 收集可见未最小化顶层窗，跨进程 SetWindowPos 合法
+  ——「重复窗口」的其他实例一并排）+ 排列图标=活动窗格 LVM_ARRANGE。
+  菜单挂「活动窗口」尾部四项（30048–30051；原版入口位置未确证*待复核*，
+  词条=菜单 216 实测）。
+  验收：lib 344 + 集成 14（358 全绿）；新钩子 QDIR_TEST_VIEWPANE（①命令
+  只改活动窗格 ②tab 记录 ③新标签页回默认 ④切页恢复 ⑤换活动窗格改目标）
+  与 QDIR_TEST_ARRANGE（①层叠=3/4@0,0 ②③平铺满铺 ④LVM_ARRANGE=true，
+  已还原启动矩形）全过；16 钩子全量回归无回归；拖出源改动后 DND 复跑绿。
+  真实鼠标拖出/Explorer 拖入（P1.3）与真实双窗排列仍 *待实测*。
+- ✅ P2.5 分组视图 GroupBy 接 UI（2026-10-24）：core 的 `GroupBy,Ext;
+  Group,1;` 状态串与 `ColumnConfig.group_by/group` 建模早已解析/往返
+  （config.rs 视图串、.qdr），但零消费——本项接通。菜单「查看→分组依据
+  (&G)」三档（无/按扩展名/按类型，GROUP_BASE=30052..30054，段冲突回归
+  测试同步扩段）；`set_group_by_active` 写活动窗格 pane.columns →
+  `apply_group_view`（关=ENABLEGROUPVIEW(0)+REMOVEALLGROUPS；开=
+  ENABLEGROUPVIEW(1)+按**行序首现**建组 `distinct_first`+逐行
+  LVIF_GROUPID，Ext=大写扩展名/无扩展名（含目录）→「(无扩展名)」、
+  Type=`type_name_of`）；fill_pane 填充尾部随视图模式一并应用（切页/
+  .qdr 载入分组随恢复）。纯函数 `group_label_ext`/`distinct_first`/
+  `group_active`（1 单测，核心 345）。分组头是否带 Explorer 式计数
+  「TXT (3)」原版未取证 *待复核*，取朴素标签。端到端（QDIR_TEST_GROUP）：
+  ①Ext 启用=1 组数=3（子目录=组1、a/b.txt=组2、c.log=组3，行组
+  [1,2,2,3]=目录优先排序自洽）全行归组+记录="Ext" ②Type 组数=3 ③关闭
+  启用=0 组数=0。359 测试全绿（345 lib + 14 集成），钩子回归（UNDO/
+  VIEWPANE/ARRANGE/OPS/KEYS/VIEW_LARGE/COLS/HISTORY）+ 启动冒烟无回归。
+- ✅ P2 copy_cut_paste_mode 接线 + P2.10 历史下拉（2026-10-24）：
+  **copy_cut_paste_mode**：config 层早已解析/持久化（[Start]
+  `copy_cut_paste_mode` u32，FileOpsConfig——PRODUCT_SPEC「file_ops.*
+  渲染端消费待后续项」的兑现）。菜单「选项」加分隔 + 两项互斥
+  （CC_MODE_COPY=30055「复制模式 Ctrl+C=复制」/ CC_MODE_CUT=30056
+  「剪切模式 Ctrl+C=剪切」），勾选态 WM_INITMENUPOPUP 刷新（原版
+  AF:76335/76347 同语义：0x8568 在 mode==0 勾、0x8569 在 mode==1 勾）；
+  命令臂切换 + 立即落 ini（原版 LAB_00473969 同款）；消费端 =
+  键盘 Ctrl+C（KbAction::Copy）与复制按钮 bi=6 在 mode==1 时改走
+  cut_to_clipboard（原版 AF:108064「复制命令后以 Preferred=MOVE 重包」
+  的等价实现）。**P2.10 历史下拉**：`TabState::history_menu_entries`
+  纯函数（当前项 ▶ 置顶 + 后退段逆序 + 前进段顺序，max 截断丢最旧，
+  1 单测）+ `go_history_to`（绝对跳转，镜像 back/forward 同步语义，
+  原位/越界拒绝）+ `build_history_menu`/`show_history_menu`
+  （HIST_BASE=30270，上限 40 条，段冲突测试扩段）——触发点 = ReBar
+  go 按钮 layout::GO（原 go.png 0xB379 下拉语义的落点解释 *待复核*，
+  此前误挂布局菜单）。
+  验收：360 测试全绿（346 lib + 14 集成）；新钩子 QDIR_TEST_CCMODE
+  （①mode=0 Ctrl+C cut=false ②菜单切剪切 config=1 + Ctrl+C cut=true
+  ③复原 config=0，原模式已恢复落盘）与 QDIR_TEST_HISTMENU（显示序
+  ▶层三/层二/层一/[启动目录]、绝对跳转双向、原位/越界拒绝）全过；
+  关键钩子（GROUP/KEYS/CLIP/OPS/UNDO/HISTORY）回归 + 启动冒烟无回归。
+  TrackPopupMenu 弹层本身无法无头自动化 *待实测*。
+- ✅ P2 排序方式子菜单 + 全屏 F11 + 标签空白双击新建（2026-10-24）：
+  **排序方式**（menu_texts:75 确证入口）：查看菜单「排序方式(&O)」7 项
+  （名称/扩展名/大小/修改日期/类型 = core::SortKey 序 + 分隔 + 递增/递减，
+  SORT_BASE=30065、SORT_ASC/DESC=30070/30071）；`set_sort_active` 写活动
+  窗格当前标签页 sort_key/sort_dir（.qdr 持久化位）+ fill_pane 重排；
+  WM_INITMENUPOPUP 键+方向勾选刷新。**全屏 F11**（menu_texts:73 确证）：
+  加速键表加 F11→VIEW_FULLSCREEN(30072)；`toggle_fullscreen` 保存
+  WINDOWPLACEMENT+GWL_STYLE → WS_OVERLAPPEDWINDOW→WS_POPUP + 铺满最近
+  显示器 → 退出还原。**标签空白新建**（audit #11，config 键
+  tab_new_tab_l_dblclk/clk 建模已久接通消费）：subclass ROLE_TAB 空白区
+  （TCM_HITTEST=-1）双击/单击按开关 pane_add_tab，双击一律吞事件防跳变。
+  **NATIVE_SPEC A.7 增量**（不改既有结论）：槽族 WM_COMMAND 分发条件
+  `(ushort)(id+0x4868)<0x3e9`（回绕 ⇔ id∈0xB798–0xBB80，AF:86814）+ 槽表
+  param+0x7C90 + Ctrl=复制+SetTimer(0x2711)/Shift=另存链内部再证；1000 id
+  的 UI 构建源仍无静态命中，入口维持 *待复核*。
+  验收：360 测试全绿（346 lib + 14 集成）；新钩子 QDIR_TEST_SORT（Ext
+  递增 b.log 首位/递减反转/名称递增复原+记录）、QDIR_TEST_FULLSCR
+  （caption 清除+铺满 1920×1080+退出还原；整体样式位差 0x10000000=
+  WS_VISIBLE 属探针时点良性差异，语义断言通过）、QDIR_TEST_TABNEW
+  （配置实证 dblclk=true/clk=false：双击 1→2、单击不变）全过；9 钩子
+  回归 + 启动冒烟无回归。打印（P2.8）经取证暂缓：原版无 StartDocW/PrintDlgW，
+  GetPrinterW(5)→CreateDCW 引擎疑为页边距/预览子系统（AF:162064 系），
+  语义未闭合 *待复核*，现 FILE_PRINT（shell print 动词）维持。
+- **2026-10-24 ✅ 标签右键菜单（#12）+ 选择性粘贴（#22）+ 数据大小 F9（#45）
+  + P2.6 列配置 blob 导入**：
+  #12 `tab_use_context_menu` 消费：tab 角色 WM_CONTEXTMENU→ScreenToClient→
+  TCM_HITTEST→先选中后弹（build_tab_menu：新建/重复=menu_texts 41/40 确证；
+  关闭/关闭其他=常规语义推断 *待复核*）；TrackPopupMenu TPM_RETURNCMD 本地
+  分发 tab_menu_action。#22 编辑菜单新增「选择性粘贴 Ctrl+Shift+V」（加速键
+  +局部 Ctrl+Shift+V 让路双通道）；对话框=勾选条目（LVS_EX_CHECKBOXES）+
+  冲突三策略（询问/自动重命名/跳过同名，shell::pasteplan 纯函数），执行链
+  paste_special_exec 走真实剪贴板。#45 F9 数据大小信息（menu_texts:102）：
+  shell::sizeinfo 递归统计（符号链接不跟随、根不计目录）+ 选中项逐行/合计，
+  MessageBox 展示。另：编辑菜单全选/反选/在新标签页中打开（选择）+
+  Ctrl+K 重复标签（menu_texts 36–43 全量建模）。
+  **NATIVE_SPEC A.9 增量**（新节，不改既有结论）：Spatlen_* blob 字节取证
+  （772 净载荷+CODEMODE 尾标；1SPS 属性袋；键锚定解析——条目非 4 字节对齐），
+  viewstate 解码→ColumnViewState 投影→load_config_bytes 导入→MainFrame::new
+  应用（view_mode 不覆盖，.qdr 优先 *待复核*）；保存不写出（R2）。
+  验收：**377 测试全绿**（363 lib + 3 bin + 6 config + 5 core，只增不减）；
+  新钩子 QDIR_TEST_TABMENU（门=true→命中标签0→新建3/重复4/关闭/关闭其他
+  剩1→门关不动）、QDIR_TEST_PASTESPECIAL（Skip：同名保留异名粘入；Rename：
+  原名保留+副本出现；空选拒绝）、QDIR_TEST_SIZEINFO（递归 2文件/2目录/12字节
+  +选中行 a.txt 5 字节）全过；10 钩子回归（TRAY/CLIP/COMBO/VIEW_LARGE/
+  HISTMENU/GROUP/CCMODE/SORT/FULLSCR/TABNEW 零 panic）+ 启动冒烟通过。
+  *待实测*：弹层/对话框/MessageBox 的真实鼠标交互观感（无法无头自动化，
+  同 HISTMENU 先例）。
 **P3** Shell 扩展菜单宿主、Everything/MS-Search 集成、多语言 UI（自有文案表）、
 便携/安装版差异、托盘行为、开机恢复、拖放精修
 

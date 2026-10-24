@@ -45,17 +45,68 @@ pub mod cmd_id {
     pub const HIST_BACK: u32 = 30038; // 批次C/C4：历史后退（Alt+Left）
     pub const HIST_FORWARD: u32 = 30039; // 批次C/C4：历史前进（Alt+Right）
     /// 批次D/D3 列显隐子菜单基址（COL_BASE+0..4 = Name/Ext/Size/Modified/Attr）。
-    pub const COL_BASE: u32 = 30040;
+    /// **不得与 ZOOM_BASE(30040) 同段**：历史值 30040 与缩放 30040–30050 撞车，
+    /// dispatch 列臂在前吞掉缩放 60–120% 五档（2026-10-24 修复）。
+    pub const COL_BASE: u32 = 30110;
     /// 批次D/D2 布局槽对话框（文件菜单）。
     pub const FILE_SLOTS: u32 = 30046;
+    /// P1.1 撤消 删除（Ctrl+Z；原版 menu_texts:79 确证存在，id 未确证*待复核*）。
+    pub const VIEW_UNDO_DELETE: u32 = 30047;
+    /// P2.9 窗口排列（i18n「窗口排列（菜单 216 实测）」四词条；原版入口
+    /// 位置未确证*待复核*，挂活动窗口菜单尾部）。
+    pub const WIN_CASCADE: u32 = 30048; // 层叠
+    pub const WIN_TILE_H: u32 = 30049; // 横向平铺（Nebeneinander，左右列）
+    pub const WIN_TILE_V: u32 = 30050; // 纵向平铺（Untereinander，上下行）
+    pub const WIN_ARRANGE_ICONS: u32 = 30051; // 排列图标（LVM_ARRANGE）
+    /// P2.5 分组依据子菜单基址（+0 无 / +1 扩展名 / +2 类型；
+    /// .qdr 视图串 GroupBy/Group 建模早已往返，本项接通 UI 消费）。
+    pub const GROUP_BASE: u32 = 30052;
+    /// P2（copy_cut_paste_mode 接线）：复制/剪切模式对（互斥勾选；
+    /// 原版 0x8568=复制档 / 0x8569=剪切档，AF:84516/84627）。
+    pub const CC_MODE_COPY: u32 = 30055;
+    pub const CC_MODE_CUT: u32 = 30056;
+    /// P2.10 历史下拉弹层基址（TrackPopupMenu 宿主，id = HIST_BASE + 显示序；
+    /// 上限 40 条。ZOOM 30250..30261 之后）。
+    pub const HIST_BASE: u32 = 30270;
+    /// 历史下拉显示上限。
+    pub const HIST_MENU_MAX: usize = 40;
+    /// P2 排序方式子菜单基址（+0 名称 /+1 扩展名 /+2 大小 /+3 修改日期
+    /// /+4 类型 = core::SortKey 序；menu_texts:75「排序方式(O)」确证存在
+    /// 于视图菜单）。
+    pub const SORT_BASE: u32 = 30065;
+    pub const SORT_ASC: u32 = 30070; // 递增（core::SortDir::Asc=0）
+    pub const SORT_DESC: u32 = 30071; // 递减
+    /// P2 全屏 F11（menu_texts:73「全屏 (F)\tF11」确证存在）。
+    pub const VIEW_FULLSCREEN: u32 = 30072;
+    /// 本批（2026-10-24）：编辑菜单族 + 数据大小 + 标签重复。
+    /// 30073..30079 段空闲（SORT 止于 30071、全屏 30072、收藏夹自 30100）。
+    pub const FILE_DUP_TAB: u32 = 30057; // 重复标签页 Ctrl+K（menu_texts:40）
+    pub const EDIT_SELECT_ALL: u32 = 30073; // 全选 Ctrl+A（menu_texts:37）
+    pub const EDIT_SELECT_INVERT: u32 = 30074; // 反选 Ctrl+Shift+A（menu_texts:38）
+    pub const EDIT_OPEN_IN_NEW_TAB: u32 = 30075; // 在新标签页中打开（menu_texts:39）
+    pub const EDIT_OPEN_SEL_NEW_TAB: u32 = 30076; // 在新标签页中打开选择（menu_texts:42）
+    pub const EDIT_PASTE_SPECIAL: u32 = 30077; // 选择性粘贴 Ctrl+Shift+V（menu_texts:43）
+    pub const FILE_SIZE_INFO: u32 = 30078; // 数据大小信息 F9（menu_texts:102）
+    /// 标签右键弹层基址（TrackPopupMenu TPM_RETURNCMD 宿主，show_tab_menu
+    /// 内处理，不进 dispatch；仍纳入段互斥回归）。**不得落在
+    /// HIST_BASE(30270)..30270+40**——初值 30290 与历史下拉段重叠（回归
+    /// 测试抓出），顺延到 HIST 段后。
+    pub const TABMENU_BASE: u32 = 30310;
+    pub const TABMENU_NEW: u32 = TABMENU_BASE; // 新建标签页（menu_texts:41）
+    pub const TABMENU_DUP: u32 = TABMENU_BASE + 1; // 重复标签页（menu_texts:40）
+    pub const TABMENU_CLOSE: u32 = TABMENU_BASE + 2; // 关闭标签页（推断：菜单文案无取证，标签菜单常规语义）
+    pub const TABMENU_CLOSE_OTHERS: u32 = TABMENU_BASE + 3; // 关闭其他标签页（推断同上）
     pub const VIEW_TREE_TOGGLE: u32 = 30029;
     // 树模式三档 + 循环（附录 A.3：原 54001/54002/54003/54006 系）。
     pub const VIEW_TREE_SPLIT: u32 = 30030; // tree_mode=1 双列
     pub const VIEW_TREE_OVERLAY: u32 = 30031; // tree_mode=2 覆盖
     pub const VIEW_TREE_OFF: u32 = 30032; // tree_mode=0 关
     pub const VIEW_TREE_CYCLE: u32 = 30033; // +1 循环
-    // 缩放（60/80/100/110/120/130/140/150/160/180/200）
-    pub const ZOOM_BASE: u32 = 30040;
+    // 缩放（60/80/100/110/120/130/140/150/160/180/200）。**不得落在
+    // 30040–30050**：与列显隐旧位（COL_BASE）、布局槽(30046) 撞车——
+    // 点缩放 130% 会先匹配 FILE_SLOTS 臂弹出布局槽对话框（match 先中
+    // 先得，测试命令段两两不交 2026-10-24 抓出）。
+    pub const ZOOM_BASE: u32 = 30250;
     // 配色（5 档）
     pub const THEME_BASE: u32 = 30060;
     // 活动窗口 #1..#4
@@ -70,8 +121,10 @@ pub mod cmd_id {
     pub const TRAY_EXIT: u32 = 30221;
     // 帮助
     pub const ABOUT: u32 = 30200;
-    // 布局弹出菜单 12 档（Layout::ALL 序）
-    pub const LAYOUT_BASE: u32 = 30090;
+    // 布局弹出菜单 12 档（Layout::ALL 序）。**不得落在 30090–30101**：
+    // 历史值 30090 与 FAV_ADD(30100)/FAV_MANAGE(30101) 命名空间重叠，
+    // 靠 TrackPopupMenu 不走 WM_COMMAND 才未出事（2026-10-24 重编号消歧）。
+    pub const LAYOUT_BASE: u32 = 30230;
 
     pub const ZOOM_STEPS: [u32; 11] = [60, 80, 100, 110, 120, 130, 140, 150, 160, 180, 200];
 }
@@ -139,8 +192,23 @@ pub fn build_main_menu() -> windows::core::Result<HMENU> {
     add(m, "以管理员身份重新启动(&G)", cmd_id::FILE_RESTART_ADMIN);
     add(m, "打印(&I)", cmd_id::FILE_PRINT);
     add(m, "查找(&F)", cmd_id::FIND);
+    // P2 audit #45：数据大小信息（menu_texts:102「数据大小信息 [F9]」）。
+    add(m, "数据大小信息(&Z)\tF9", cmd_id::FILE_SIZE_INFO);
     let _ = unsafe { AppendMenuW(m, MF_SEPARATOR, 0, PCWSTR::null()) };
     add(m, "退出(&X)", cmd_id::FILE_EXIT);
+
+    // —— 编辑（menu_texts 编辑(E) 段 36–43 文案；Ctrl+A/Ctrl+Shift+A 保持
+    // 列表局部键盘（app.rs 注释），菜单文案作提示）——
+    let ed = popup(file, "编辑(&E)");
+    add(ed, "全选(&L)  Ctrl+A", cmd_id::EDIT_SELECT_ALL);
+    add(ed, "反选(&I)  Ctrl+Shift+A", cmd_id::EDIT_SELECT_INVERT);
+    let _ = unsafe { AppendMenuW(ed, MF_SEPARATOR, 0, PCWSTR::null()) };
+    add(ed, "在新标签页中打开(&T)", cmd_id::EDIT_OPEN_IN_NEW_TAB);
+    add(ed, "重复标签页(&D)  Ctrl+K", cmd_id::FILE_DUP_TAB);
+    add(ed, "新建标签页(&N)  Ctrl+T", cmd_id::FILE_NEW_TAB);
+    add(ed, "在新标签页中打开选择(&S)  Shift+Enter", cmd_id::EDIT_OPEN_SEL_NEW_TAB);
+    let _ = unsafe { AppendMenuW(ed, MF_SEPARATOR, 0, PCWSTR::null()) };
+    add(ed, "选择性粘贴(&P)  Ctrl+Shift+V", cmd_id::EDIT_PASTE_SPECIAL);
 
     // —— 查看 ——
     let v = popup(file, "查看(&V)");
@@ -151,7 +219,21 @@ pub fn build_main_menu() -> windows::core::Result<HMENU> {
     add(vm, "详细信息(&D)", cmd_id::VIEW_DETAILS);
     add(v, "显示网格线(&G)", cmd_id::VIEW_GRIDLINES);
     add(v, "重命名(&F2)", cmd_id::VIEW_RENAME);
+    add(v, "全屏(&F)\tF11", cmd_id::VIEW_FULLSCREEN);
+    add(v, "撤消 删除(&U)\tCtrl+Z", cmd_id::VIEW_UNDO_DELETE);
     add(v, "显示隐藏文件(&H)", cmd_id::VIEW_SHOW_HIDDEN);
+    // P2：排序方式子菜单（menu_texts:75 确证存在；键序=core::SortKey）。
+    {
+        let sp = popup(v, "排序方式(&O)");
+        add(sp, "名称(&N)", cmd_id::SORT_BASE);
+        add(sp, "扩展名(&E)", cmd_id::SORT_BASE + 1);
+        add(sp, "大小(&S)", cmd_id::SORT_BASE + 2);
+        add(sp, "修改日期(&M)", cmd_id::SORT_BASE + 3);
+        add(sp, "类型(&T)", cmd_id::SORT_BASE + 4);
+        let _ = unsafe { AppendMenuW(sp, MF_SEPARATOR, 0, PCWSTR::null()) };
+        add(sp, "递增(&A)", cmd_id::SORT_ASC);
+        add(sp, "递减(&D)", cmd_id::SORT_DESC);
+    }
     add(v, "后退(&B)\tAlt+Left", cmd_id::HIST_BACK);
     add(v, "前进(&F)\tAlt+Right", cmd_id::HIST_FORWARD);
     add(v, "新建标签页(&E)\tCtrl+T", cmd_id::FILE_NEW_TAB);
@@ -177,6 +259,14 @@ pub fn build_main_menu() -> windows::core::Result<HMENU> {
             };
             let _ = key; // key 由 COLUMN_KEYS 按序对应（menu 顺序=COLUMN_KEYS 顺序）
         }
+    }
+    // P2.5：分组依据子菜单（GroupBy,Ext;Group,1; 状态串消费；勾选态
+    // 未做 WM_INITMENUPOPUP 刷新，按命令即效）。
+    {
+        let gp = popup(v, "分组依据(&G)");
+        add(gp, "无(&N)", cmd_id::GROUP_BASE);
+        add(gp, "按扩展名(&E)", cmd_id::GROUP_BASE + 1);
+        add(gp, "按类型(&T)", cmd_id::GROUP_BASE + 2);
     }
     add(v, "预览面板(&P)", cmd_id::VIEW_PREVIEW_TOGGLE);
     add(v, "高亮/着色规则(&K)…", cmd_id::RULES_EDIT);
@@ -205,6 +295,12 @@ pub fn build_main_menu() -> windows::core::Result<HMENU> {
     for i in 0..4u32 {
         add(aw, &format!("窗口 &{}", i + 1), cmd_id::ACTIVE_BASE + i);
     }
+    // P2.9：窗口排列（层叠/横向平铺/纵向平铺/排列图标）。
+    let _ = unsafe { AppendMenuW(aw, MF_SEPARATOR, 0, PCWSTR::null()) };
+    add(aw, "层叠(&C)", cmd_id::WIN_CASCADE);
+    add(aw, "横向平铺(&H)", cmd_id::WIN_TILE_H);
+    add(aw, "纵向平铺(&V)", cmd_id::WIN_TILE_V);
+    add(aw, "排列图标(&A)", cmd_id::WIN_ARRANGE_ICONS);
 
     // —— 收藏夹 ——
     let fv = popup(file, "收藏夹(&A)");
@@ -214,6 +310,11 @@ pub fn build_main_menu() -> windows::core::Result<HMENU> {
     // —— 选项 ——
     let op = popup(file, "选项(&O)");
     add(op, "设置(&S)…", cmd_id::OPTIONS_SETTINGS);
+    // P2：复制/剪切模式对（原版 0x8568/0x8569 互斥勾选；mode=1 时
+    // Ctrl+C/复制按钮以剪切语义写剪贴板，AF:108064 证据）。
+    let _ = unsafe { AppendMenuW(op, MF_SEPARATOR, 0, PCWSTR::null()) };
+    add(op, "复制模式：Ctrl+C=复制(&C)", cmd_id::CC_MODE_COPY);
+    add(op, "剪切模式：Ctrl+C=剪切(&K)", cmd_id::CC_MODE_CUT);
 
     // —— 帮助 ——
     let hp = popup(file, "帮助(&H)");
@@ -245,6 +346,36 @@ pub fn build_layout_menu() -> windows::core::Result<HMENU> {
     Ok(m)
 }
 
+/// P2.10：历史下拉弹层（TrackPopupMenu 宿主；id = HIST_BASE + 显示序，
+/// 返回值由调用方按 entries 映射回 history 下标）。
+pub fn build_history_menu(entries: &[(usize, String)]) -> windows::core::Result<HMENU> {
+    let m = unsafe { CreatePopupMenu() }?;
+    for (i, (_, label)) in entries.iter().enumerate() {
+        let w = s(label);
+        let _ = unsafe {
+            AppendMenuW(
+                m,
+                MF_STRING,
+                (cmd_id::HIST_BASE + i as u32) as usize,
+                PCWSTR(w.as_ptr()),
+            )
+        };
+    }
+    Ok(m)
+}
+
+/// P2 audit #12：标签右键弹层（文案：新建/重复取 menu_texts 41/40 确证；
+/// 关闭族无文案取证，按标签菜单常规语义 *待复核*）。
+pub fn build_tab_menu() -> windows::core::Result<HMENU> {
+    let m = unsafe { CreatePopupMenu() }?;
+    add(m, "新建标签页(&N)  Ctrl+T", cmd_id::TABMENU_NEW);
+    add(m, "重复标签页(&D)  Ctrl+K", cmd_id::TABMENU_DUP);
+    let _ = unsafe { AppendMenuW(m, MF_SEPARATOR, 0, PCWSTR::null()) };
+    add(m, "关闭标签页(&C)", cmd_id::TABMENU_CLOSE);
+    add(m, "关闭其他标签页(&O)", cmd_id::TABMENU_CLOSE_OTHERS);
+    Ok(m)
+}
+
 #[cfg(test)]
 mod tests {
     use super::cmd_id::*;
@@ -259,6 +390,57 @@ mod tests {
             assert!(!(1000..=1399).contains(&id), "与窗格控件冲突：{id}");
             assert!(id != 0x5A00, "与 QuickLink 段冲突");
             assert!(id >= 30000, "应全部落在自有 30000+ 段：{id}");
+        }
+    }
+
+    /// 自有命令段两两不交（回归锁：COL_BASE 曾与 ZOOM_BASE 同为 30040，
+    /// 缩放 60–120% 五档被列显隐臂吞掉——match 先中先得）。
+    #[test]
+    fn 命令段两两不交() {
+        let ranges: [(u32, u32, &str); 10] = [
+            (COL_BASE, COL_BASE + 5, "列显隐"),
+            (ZOOM_BASE, ZOOM_BASE + 11, "缩放"),
+            (THEME_BASE, THEME_BASE + 5, "配色"),
+            (ACTIVE_BASE, ACTIVE_BASE + 4, "活动窗口"),
+            (LAYOUT_BASE, LAYOUT_BASE + 12, "布局弹出"),
+            (GROUP_BASE, GROUP_BASE + 3, "分组依据"),
+            (HIST_BASE, HIST_BASE + 40, "历史下拉"),
+            (SORT_BASE, SORT_DESC + 1, "排序方式"),
+            (TABMENU_BASE, TABMENU_CLOSE_OTHERS + 1, "标签右键弹层"),
+            (0x5A00, 0x5A00 + 1, "QuickLink 弹层"),
+        ];
+        for i in 0..ranges.len() {
+            for j in i + 1..ranges.len() {
+                let (a0, a1, na) = ranges[i];
+                let (b0, b1, nb) = ranges[j];
+                let overlap = a0 < b1 && b0 < a1;
+                assert!(!overlap, "段重叠：{na}[{a0},{a1}) × {nb}[{b0},{b1})");
+            }
+        }
+        // 散点单值 id 不得落入任何连续段。
+        let singles: [u32; 27] = [
+            FILE_OPEN_STATE, FILE_SAVE_STATE, FILE_SAVE_STATE_DESKTOP, FILE_DUP_WINDOW,
+            FILE_CMD, FILE_POWERSHELL, FILE_RUN, FILE_EXIT, FILE_EXPORT, FILE_PRINT, FIND,
+            FILE_RESTART, FILE_RESTART_ADMIN, FILE_NEW_FOLDER, FILE_NEW_TAB,
+            VIEW_ICON, VIEW_SMALL_ICON, VIEW_LIST, VIEW_DETAILS, VIEW_GRIDLINES,
+            VIEW_FIT_COL_HEADER, VIEW_FIT_COL, VIEW_REFRESH, VIEW_PREVIEW_TOGGLE,
+            RULES_EDIT, VIEW_RENAME, VIEW_SHOW_HIDDEN,
+        ];
+        let more: [u32; 13] = [
+            HIST_BACK, HIST_FORWARD, FILE_SLOTS, VIEW_UNDO_DELETE, VIEW_TREE_TOGGLE,
+            VIEW_TREE_SPLIT, VIEW_TREE_OVERLAY, VIEW_TREE_OFF, FAV_ADD,
+            WIN_CASCADE, WIN_TILE_H, WIN_TILE_V, WIN_ARRANGE_ICONS,
+        ];
+        for s in singles.into_iter().chain(more).chain([
+            FAV_MANAGE, ABOUT, OPTIONS_SETTINGS, TRAY_SHOW, TRAY_EXIT,
+            CC_MODE_COPY, CC_MODE_CUT, VIEW_FULLSCREEN,
+            FILE_DUP_TAB, EDIT_SELECT_ALL, EDIT_SELECT_INVERT,
+            EDIT_OPEN_IN_NEW_TAB, EDIT_OPEN_SEL_NEW_TAB, EDIT_PASTE_SPECIAL,
+            FILE_SIZE_INFO,
+        ]) {
+            for (r0, r1, name) in ranges {
+                assert!(!(s >= r0 && s < r1), "散点 {s} 落入 {name}[{r0},{r1})");
+            }
         }
     }
 
